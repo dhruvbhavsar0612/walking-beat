@@ -1,0 +1,363 @@
+{
+  "sensor": "thigh",
+  "dataset": "Daphnet Freezing of Gait (UCI #245)",
+  "protocol": "nested leave-one-subject-out; model and thresholds never see the evaluated patient",
+  "window_sec": 3.0,
+  "hop_sec": 0.5,
+  "profiles": {
+    "conservative": {
+      "false_alarm_budget_per_hour": 0.5,
+      "loso_population": {
+        "episodes": 237,
+        "detected": 21,
+        "sensitivity": 0.089,
+        "episodes_ge_5s": 123,
+        "sensitivity_ge_5s": 0.114,
+        "false_alarms": 11,
+        "non_fog_hours": 4.47,
+        "false_alarms_per_hour": 2.46,
+        "median_latency_s": 1.84
+      },
+      "loso_with_personal_calibration": {
+        "episodes": 237,
+        "detected": 18,
+        "sensitivity": 0.076,
+        "episodes_ge_5s": 123,
+        "sensitivity_ge_5s": 0.106,
+        "false_alarms": 9,
+        "non_fog_hours": 4.47,
+        "false_alarms_per_hour": 2.01,
+        "median_latency_s": 2.16
+      },
+      "per_fold_choices": [
+        {
+          "held_out": "S01",
+          "prob_threshold": 0.8,
+          "confirm_sec": 4.0,
+          "require_prior_walking": true,
+          "stand_power_min": 0.001
+        },
+        {
+          "held_out": "S02",
+          "prob_threshold": 0.9,
+          "confirm_sec": 4.0,
+          "require_prior_walking": true,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S03",
+          "prob_threshold": 0.9,
+          "confirm_sec": 4.0,
+          "require_prior_walking": true,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S04",
+          "prob_threshold": 0.95,
+          "confirm_sec": 3.0,
+          "require_prior_walking": true,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S05",
+          "prob_threshold": 0.9,
+          "confirm_sec": 4.0,
+          "require_prior_walking": true,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S06",
+          "prob_threshold": 0.9,
+          "confirm_sec": 4.0,
+          "require_prior_walking": true,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S07",
+          "prob_threshold": 0.95,
+          "confirm_sec": 1.5,
+          "require_prior_walking": true,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S08",
+          "prob_threshold": 0.9,
+          "confirm_sec": 4.0,
+          "require_prior_walking": true,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S09",
+          "prob_threshold": 0.95,
+          "confirm_sec": 2.0,
+          "require_prior_walking": true,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S10",
+          "prob_threshold": 0.95,
+          "confirm_sec": 3.0,
+          "require_prior_walking": true,
+          "stand_power_min": 0.003
+        }
+      ],
+      "final_config": {
+        "window_sec": 3.0,
+        "hop_sec": 0.5,
+        "walk_power_min": 0.001,
+        "walk_fi_max": 2.0,
+        "walk_freq_min": 0.6,
+        "walk_freq_max": 2.6,
+        "min_walk_sec": 3.0,
+        "arm_timeout_sec": 5.0,
+        "fi_threshold": 3.0,
+        "prob_threshold": 0.9,
+        "stand_power_min": 0.003,
+        "confirm_sec": 4.0,
+        "max_gap_hops": 1,
+        "resume_walk_sec": 2.0,
+        "still_end_sec": 3.0,
+        "max_cue_sec": 30.0,
+        "refractory_sec": 3.0,
+        "require_prior_walking": true,
+        "use_model": true
+      }
+    },
+    "balanced": {
+      "false_alarm_budget_per_hour": 1.0,
+      "loso_population": {
+        "episodes": 237,
+        "detected": 22,
+        "sensitivity": 0.093,
+        "episodes_ge_5s": 123,
+        "sensitivity_ge_5s": 0.122,
+        "false_alarms": 14,
+        "non_fog_hours": 4.47,
+        "false_alarms_per_hour": 3.13,
+        "median_latency_s": 1.55
+      },
+      "loso_with_personal_calibration": {
+        "episodes": 237,
+        "detected": 19,
+        "sensitivity": 0.08,
+        "episodes_ge_5s": 123,
+        "sensitivity_ge_5s": 0.114,
+        "false_alarms": 9,
+        "non_fog_hours": 4.47,
+        "false_alarms_per_hour": 2.01,
+        "median_latency_s": 2.48
+      },
+      "per_fold_choices": [
+        {
+          "held_out": "S01",
+          "prob_threshold": 0.8,
+          "confirm_sec": 4.0,
+          "require_prior_walking": true,
+          "stand_power_min": 0.0003
+        },
+        {
+          "held_out": "S02",
+          "prob_threshold": 0.9,
+          "confirm_sec": 3.0,
+          "require_prior_walking": true,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S03",
+          "prob_threshold": 0.9,
+          "confirm_sec": 4.0,
+          "require_prior_walking": true,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S04",
+          "prob_threshold": 0.95,
+          "confirm_sec": 1.5,
+          "require_prior_walking": true,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S05",
+          "prob_threshold": 0.95,
+          "confirm_sec": 1.5,
+          "require_prior_walking": true,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S06",
+          "prob_threshold": 0.95,
+          "confirm_sec": 1.5,
+          "require_prior_walking": true,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S07",
+          "prob_threshold": 0.95,
+          "confirm_sec": 1.5,
+          "require_prior_walking": true,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S08",
+          "prob_threshold": 0.9,
+          "confirm_sec": 4.0,
+          "require_prior_walking": true,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S09",
+          "prob_threshold": 0.9,
+          "confirm_sec": 3.0,
+          "require_prior_walking": true,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S10",
+          "prob_threshold": 0.9,
+          "confirm_sec": 3.0,
+          "require_prior_walking": true,
+          "stand_power_min": 0.003
+        }
+      ],
+      "final_config": {
+        "window_sec": 3.0,
+        "hop_sec": 0.5,
+        "walk_power_min": 0.001,
+        "walk_fi_max": 2.0,
+        "walk_freq_min": 0.6,
+        "walk_freq_max": 2.6,
+        "min_walk_sec": 3.0,
+        "arm_timeout_sec": 5.0,
+        "fi_threshold": 3.0,
+        "prob_threshold": 0.9,
+        "stand_power_min": 0.003,
+        "confirm_sec": 3.0,
+        "max_gap_hops": 1,
+        "resume_walk_sec": 2.0,
+        "still_end_sec": 3.0,
+        "max_cue_sec": 30.0,
+        "refractory_sec": 3.0,
+        "require_prior_walking": true,
+        "use_model": true
+      }
+    },
+    "responsive": {
+      "false_alarm_budget_per_hour": 2.0,
+      "loso_population": {
+        "episodes": 237,
+        "detected": 53,
+        "sensitivity": 0.224,
+        "episodes_ge_5s": 123,
+        "sensitivity_ge_5s": 0.309,
+        "false_alarms": 10,
+        "non_fog_hours": 4.47,
+        "false_alarms_per_hour": 2.24,
+        "median_latency_s": 1.84
+      },
+      "loso_with_personal_calibration": {
+        "episodes": 237,
+        "detected": 44,
+        "sensitivity": 0.186,
+        "episodes_ge_5s": 123,
+        "sensitivity_ge_5s": 0.276,
+        "false_alarms": 8,
+        "non_fog_hours": 4.47,
+        "false_alarms_per_hour": 1.79,
+        "median_latency_s": 3.29
+      },
+      "per_fold_choices": [
+        {
+          "held_out": "S01",
+          "prob_threshold": 0.8,
+          "confirm_sec": 4.0,
+          "require_prior_walking": false,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S02",
+          "prob_threshold": 0.9,
+          "confirm_sec": 3.0,
+          "require_prior_walking": false,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S03",
+          "prob_threshold": 0.9,
+          "confirm_sec": 1.0,
+          "require_prior_walking": true,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S04",
+          "prob_threshold": 0.9,
+          "confirm_sec": 3.0,
+          "require_prior_walking": false,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S05",
+          "prob_threshold": 0.8,
+          "confirm_sec": 4.0,
+          "require_prior_walking": false,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S06",
+          "prob_threshold": 0.9,
+          "confirm_sec": 4.0,
+          "require_prior_walking": false,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S07",
+          "prob_threshold": 0.8,
+          "confirm_sec": 3.0,
+          "require_prior_walking": true,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S08",
+          "prob_threshold": 0.9,
+          "confirm_sec": 4.0,
+          "require_prior_walking": false,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S09",
+          "prob_threshold": 0.8,
+          "confirm_sec": 4.0,
+          "require_prior_walking": false,
+          "stand_power_min": 0.003
+        },
+        {
+          "held_out": "S10",
+          "prob_threshold": 0.8,
+          "confirm_sec": 3.0,
+          "require_prior_walking": true,
+          "stand_power_min": 0.003
+        }
+      ],
+      "final_config": {
+        "window_sec": 3.0,
+        "hop_sec": 0.5,
+        "walk_power_min": 0.001,
+        "walk_fi_max": 2.0,
+        "walk_freq_min": 0.6,
+        "walk_freq_max": 2.6,
+        "min_walk_sec": 3.0,
+        "arm_timeout_sec": 5.0,
+        "fi_threshold": 3.0,
+        "prob_threshold": 0.9,
+        "stand_power_min": 0.003,
+        "confirm_sec": 3.0,
+        "max_gap_hops": 1,
+        "resume_walk_sec": 2.0,
+        "still_end_sec": 3.0,
+        "max_cue_sec": 30.0,
+        "refractory_sec": 3.0,
+        "require_prior_walking": false,
+        "use_model": true
+      }
+    }
+  }
+}

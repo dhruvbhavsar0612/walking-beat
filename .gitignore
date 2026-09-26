@@ -1,0 +1,9 @@
+research/data/
+research/.cache/
+__pycache__/
+.pytest_cache/
+Packages/FoGCore/.build/
+.swiftpm/
+*.xcodeproj/
+DerivedData/
+.DS_Store

@@ -1,0 +1,68 @@
+name: FoGCue
+options:
+  bundleIdPrefix: com.example.fogcue
+  deploymentTarget:
+    iOS: "17.0"
+    watchOS: "10.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    DEVELOPMENT_TEAM: ""
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+packages:
+  FoGCore:
+    path: Packages/FoGCore
+targets:
+  FoGCue:
+    type: application
+    platform: iOS
+    sources: [PhoneApp/Sources]
+    dependencies:
+      - package: FoGCore
+        product: FoGCore
+      - package: FoGCore
+        product: FoGKit
+      - target: FoGCueWatch
+    info:
+      path: PhoneApp/Info.plist
+      properties:
+        CFBundleDisplayName: Walking Beat
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.fogcue
+        TARGETED_DEVICE_FAMILY: "1"
+  FoGCueWatch:
+    type: application
+    platform: watchOS
+    sources: [WatchApp/Sources]
+    dependencies:
+      - package: FoGCore
+        product: FoGCore
+      - package: FoGCore
+        product: FoGKit
+      - sdk: HealthKit.framework
+    info:
+      path: WatchApp/Info.plist
+      properties:
+        CFBundleDisplayName: Walking Beat
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: com.example.fogcue
+        WKBackgroundModes: [workout-processing]
+        NSMotionUsageDescription: Used to notice when walking suddenly stops so the walking beat can start.
+        NSHealthShareUsageDescription: Walk sessions run as a workout so the watch keeps listening with the screen off.
+        NSHealthUpdateUsageDescription: Walk sessions run as a workout so the watch keeps listening with the screen off. Workouts are not saved.
+    entitlements:
+      path: WatchApp/FoGCueWatch.entitlements
+      properties:
+        com.apple.developer.healthkit: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.fogcue.watchkitapp
+        TARGETED_DEVICE_FAMILY: "4"
+        SKIP_INSTALL: YES

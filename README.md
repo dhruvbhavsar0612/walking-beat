@@ -54,6 +54,7 @@ Test these on a real device. Simulators don't produce real accelerometer data or
 ```bash
 # Swift core (Linux or macOS, Swift 5.9+)
 cd Packages/FoGCore && swift test
+# The parity recordings live as Fixtures/*.partNN. The test joins them.
 
 # Python reference pipeline
 cd research

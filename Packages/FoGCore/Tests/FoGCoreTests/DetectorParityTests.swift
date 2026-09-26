@@ -37,13 +37,26 @@ final class DetectorParityTests: XCTestCase {
     override class func setUp() {
         super.setUp()
         let dir = Bundle.module.url(forResource: "Fixtures", withExtension: nil)!
-        expected = try! DetectorProfiles.decoder().decode(Expected.self, from: Data(contentsOf: dir.appendingPathComponent("expected.json")))
-        let csv = try! String(contentsOf: dir.appendingPathComponent("samples.csv"), encoding: .utf8)
+        expected = try! DetectorProfiles.decoder().decode(Expected.self, from: Self.fixtureData(dir, "expected.json"))
+        let csv = String(decoding: Self.fixtureData(dir, "samples.csv"), as: UTF8.self)
         samples = csv.split(separator: "\n").map { line in
             let v = line.split(separator: ",").map { Double($0)! }
             return AccelSample(x: v[0], y: v[1], z: v[2])
         }
         profiles = try! DetectorProfiles.bundled()
+    }
+
+    /// Whole fixture if present, otherwise the `.partNN` chunks committed to git
+    /// (the upload path cannot carry the 641 KB recording in one request).
+    private static func fixtureData(_ dir: URL, _ name: String) -> Data {
+        let whole = dir.appendingPathComponent(name)
+        if FileManager.default.fileExists(atPath: whole.path) {
+            return (try? Data(contentsOf: whole)) ?? Data()
+        }
+        let parts = ((try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? [])
+            .filter { $0.lastPathComponent.hasPrefix(name + ".part") }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        return parts.reduce(into: Data()) { acc, url in acc.append((try? Data(contentsOf: url)) ?? Data()) }
     }
 
     private func streamFeatures(_ cfg: DetectorConfig) -> [WindowFeatures] {

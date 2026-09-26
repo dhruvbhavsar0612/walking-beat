@@ -10,6 +10,54 @@ enum AppRole: String {
     case caregiver
 }
 
+extension Notification.Name {
+    /// Phone app's own beat (no watch needed): "start the rhythm right now".
+    static let startPhoneBeat = Notification.Name("fogcue.startPhoneBeat")
+    /// Stop the phone-side beat.
+    static let stopPhoneBeat = Notification.Name("fogcue.stopPhoneBeat")
+}
+
+/// Phone-only cueing fallback: when no watch is paired/in range, the phone itself taps and
+/// plays the beat, and still logs the event so the journal stays complete. Detection stays
+/// watch-only; this covers the "Help me walk" path everywhere.
+@MainActor
+final class PhoneBeatController: ObservableObject {
+    @Published private(set) var active = false
+    private let preview = MetronomePreview()
+    private var startedAt: Date?
+    private var eventId: UUID?
+    private weak var model: AppModel?
+
+    func attach(_ model: AppModel) { self.model = model }
+
+    func toggle() {
+        active ? stop() : start()
+    }
+
+    func start() {
+        guard let model else { return }
+        let id = UUID()
+        eventId = id
+        startedAt = Date()
+        active = true
+        let e = FoGEventRecord(id: id, start: startedAt!, source: .manual)
+        model.receive(SyncMessage.eventStarted(e)) // journal + caregiver alert path, same as watch
+        preview.start(bpm: model.settings.bpm)
+    }
+
+    func stop(endReason: CueEndReason = .manual) {
+        guard active, let model, let id = eventId, let start = startedAt else { return }
+        preview.stop()
+        active = false
+        let end = Date()
+        var e = FoGEventRecord(id: id, start: start, end: end, source: .manual, endReason: endReason)
+        e.label = model.events.first(where: { $0.id == id })?.label ?? .unlabeled
+        model.receive(SyncMessage.eventEnded(e))
+        eventId = nil
+        startedAt = nil
+    }
+}
+
 /// Phone-side state: settings authored by the caregiver, the event log, and alerts.
 @MainActor
 final class AppModel: NSObject, ObservableObject {

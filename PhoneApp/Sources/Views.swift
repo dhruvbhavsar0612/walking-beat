@@ -5,6 +5,7 @@ import SwiftUI
 @main
 struct FoGCuePhoneApp: App {
     @StateObject private var model = AppModel()
+    @StateObject private var phoneBeat = PhoneBeatController()
 
     var body: some Scene {
         WindowGroup {
@@ -12,7 +13,9 @@ struct FoGCuePhoneApp: App {
                 if model.onboarded { MainTabs() } else { OnboardingView() }
             }
             .environmentObject(model)
+            .environmentObject(phoneBeat)
             .dynamicTypeSize(.large ... .accessibility3)
+            .onAppear { phoneBeat.attach(model) }
         }
     }
 }
@@ -30,7 +33,33 @@ struct MainTabs: View {
             } else {
                 MyBeatView().tabItem { Label("My beat", systemImage: "metronome") }
                 HowItView().tabItem { Label("Help", systemImage: "questionmark.circle") }
+                CaregiverModeView().tabItem { Label("Caregiver", systemImage: "person.2") }
             }
+        }
+    }
+}
+
+/// Small tab that hands the device back to caregiver presentation. Always visible in patient
+/// mode so nobody gets stuck; the watch (or caregiver's phone) still runs everything.
+struct CaregiverModeView: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                Image(systemName: "person.2").font(.system(size: 64)).foregroundStyle(.tint)
+                Text("Setting things up?").font(.largeTitle.bold()).multilineTextAlignment(.center)
+                Text("Switch to the full caregiver app for settings, the freeze journal, and doctor export. You can switch back any time.")
+                    .font(.title3).multilineTextAlignment(.center)
+                Button {
+                    model.role = .caregiver
+                } label: {
+                    Text("Use the caregiver app").font(.title2.bold()).frame(maxWidth: .infinity, minHeight: 60)
+                }
+                .buttonStyle(.borderedProminent)
+                Spacer()
+            }.padding(24)
+            .navigationTitle("Caregiver")
         }
     }
 }
@@ -272,25 +301,55 @@ private extension TempoSetupPage { // path title helper
 
 struct MyBeatView: View {
     @EnvironmentObject var model: AppModel
+    @EnvironmentObject var phoneBeat: PhoneBeatController
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
                     HStack(spacing: 10) {
-                        Image(systemName: model.watchReachable ? "applewatch.radiowaves.left.and.right" : "applewatch.slash")
+                        Image(systemName: model.watchReachable ? "applewatch.radiowaves.left.and.right" : "iphone.radiowaves.left.and.right")
                             .font(.title2)
-                        Text(model.watchReachable ? "Watch ready" : "Watch not in range").font(.title3)
+                        Text(model.watchReachable ? "Watch ready" : "Beat runs on this phone").font(.title3)
                     }.padding(.top, 8)
+
+                    // Phone-only fallback: rhythm from the device in hand. Same journal event.
+                    if phoneBeat.active {
+                        VStack(spacing: 16) {
+                            Image(systemName: "metronome.fill").font(.system(size: 56)).foregroundStyle(.tint)
+                            Text("Beat playing — step in time").font(.headline)
+                            Button {
+                                phoneBeat.stop()
+                            } label: {
+                                Text("Stop the beat").font(.title3.bold())
+                                    .frame(maxWidth: .infinity, minHeight: 72)
+                            }
+                            .buttonStyle(.borderedProminent).tint(.red)
+                        }
+                    } else {
+                        Button {
+                            phoneBeat.start()
+                        } label: {
+                            VStack(spacing: 6) {
+                                Image(systemName: "metronome").font(.largeTitle)
+                                Text("Help me walk").font(.title.bold())
+                                Text("start the rhythm on this phone").font(.callout)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 96)
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+
                     VStack(spacing: 12) {
                         Text("\(model.today?.cues ?? 0)").font(.system(size: 72, weight: .bold))
                         Text(model.today?.cues == 1 ? "beat helped today" : "beats helped today").foregroundStyle(.secondary)
                     }.padding(.vertical, 16)
-                    Text("The watch counts automatically when walk mode is on.").font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    Text("With the watch, walk mode counts automatically. Here, pressing the button counts too.")
+                        .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     if let c = model.lastCalibration, let cad = c.cadenceStepsPerMin {
                         LabeledContent("Your walking rhythm", value: "\(Int(cad)) steps/min").font(.title3).padding(.horizontal)
                     }
-                }
+                }.padding(.horizontal)
             }
             .navigationTitle("Walking Beat")
         }

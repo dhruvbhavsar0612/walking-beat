@@ -18,62 +18,305 @@ struct FoGCuePhoneApp: App {
 }
 
 struct MainTabs: View {
+    @EnvironmentObject var model: AppModel
+
     var body: some View {
         TabView {
-            TodayView().tabItem { Label("Today", systemImage: "sun.max") }
-            EventLogView().tabItem { Label("Log", systemImage: "list.bullet.rectangle") }
-            SettingsView().tabItem { Label("Settings", systemImage: "slider.horizontal.3") }
-            AboutView().tabItem { Label("About", systemImage: "info.circle") }
+            if model.role == .caregiver {
+                TodayView().tabItem { Label("Today", systemImage: "sun.max") }
+                EventLogView().tabItem { Label("Log", systemImage: "list.bullet.rectangle") }
+                SettingsView().tabItem { Label("Settings", systemImage: "slider.horizontal.3") }
+                AboutView().tabItem { Label("About", systemImage: "info.circle") }
+            } else {
+                MyBeatView().tabItem { Label("My beat", systemImage: "metronome") }
+                HowItView().tabItem { Label("Help", systemImage: "questionmark.circle") }
+            }
         }
     }
 }
 
 // MARK: Onboarding
 
+/// Wizard: story → honest limits → role → watch check → guided setup walk → tempo → done.
+/// One idea per screen, plain language, always a big Next. Radiobutton-free; role choice is
+/// two large tappable cards (elder-friendly), not a picker.
 struct OnboardingView: View {
     @EnvironmentObject var model: AppModel
     @State private var step = 0
+    @State private var agreedLimits = false
 
     var body: some View {
         VStack(spacing: 24) {
-            Spacer()
-            switch step {
-            case 0:
-                page(icon: "figure.walk", title: "A walking beat when feet feel stuck",
-                     text: "When a freeze is detected, or when the Help button on the watch is pressed, the watch taps a steady beat on the wrist and can play a sound. Stepping in time with a beat helps many people with Parkinson's start walking again.")
-            case 1:
-                page(icon: "exclamationmark.shield", title: "Important",
-                     text: "This is a research prototype, not a medical device. It will sometimes miss a freeze and sometimes start the beat when not needed. It does not detect falls or call for help. Keep using your usual walking aids and follow your care team's advice.")
-            default:
-                page(icon: "applewatch", title: "Set up the beat",
-                     text: "On the watch, open the app and tap \"Set up my beat\", then walk normally for 2 minutes. The watch learns this person's normal walking so it does not mistake it for a freeze, and sets the beat to their own step rate.")
-            }
-            Spacer()
-            Button {
-                if step < 2 { step += 1 } else {
-                    Task { await model.requestNotificationPermission() }
-                    model.onboarded = true
+            progress
+            ScrollView {
+                switch step {
+                case 0: intro
+                case 1: limits
+                case 2: rolePick
+                case 3: watchCheck
+                case 4: SetupWalkPage()
+                case 5: tempoPage
+                default: done
                 }
-            } label: {
-                Text(step == 1 ? "I understand" : step < 2 ? "Next" : "Finish")
-                    .font(.title2.bold())
-                    .frame(maxWidth: .infinity, minHeight: 60)
             }
-            .buttonStyle(.borderedProminent)
+            navButtons
         }
         .padding(24)
     }
 
-    private func page(icon: String, title: String, text: String) -> some View {
+    private var progress: some View {
+        ProgressView(value: Double(step), total: 6)
+            .accessibilityLabel("Setup progress")
+    }
+
+    private var intro: some View {
+        page(icon: "figure.walk", title: "A beat to walk to",
+             text: "When walking suddenly feels stuck — feet glued to the floor — a steady beat on the watch helps many people with Parkinson's start stepping again. The beat follows this person's own step rate, and the watch can start it by itself when a freeze is noticed.") {
+            Text("No false-alarm surprises: every automatic cue starts as quiet wrist taps. Sound only joins if the freeze continues.")
+                .font(.callout).foregroundStyle(.secondary)
+                .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.secondarySystemBackground)).cornerRadius(12)
+        }
+    }
+
+    private var limits: some View {
+        page(icon: "exclamationmark.shield", title: "What this app does NOT do",
+             text: "This is a research prototype, not a medical device.\n\nIt will sometimes miss a freeze, and sometimes start the beat when it was not needed. It does not detect falls and does not call for help.\n\nKeep using walking aids and your care team's advice. Always tap the big Help button on the watch whenever you need the beat — it works every time.") {
+            Toggle(isOn: $agreedLimits) {
+                Text("I understand, and I still want to set it up").font(.headline)
+            }
+            .padding(.vertical, 6)
+        }
+    }
+
+    private var rolePick: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "person.2").font(.system(size: 64)).foregroundStyle(.tint)
+            Text("Who will use this phone?").font(.largeTitle.bold()).multilineTextAlignment(.center)
+            Text("Both can share it any time — this only changes what you see.").font(.title3).multilineTextAlignment(.center)
+            Button { model.role = .caregiver; withAnimation { step = 3 } } label: { roleCard("I am a family member or caregiver", subtitle: "I will set things up and follow how often freezing happens", icon: "person.2.fill") }
+            Button { model.role = .patient; withAnimation { step = 3 } } label: { roleCard("I am the person walking", subtitle: "I will use the watch; keep this phone simple", icon: "figure.walk.motion") }
+        }
+        .padding(.vertical, 8)
+    }
+
+    private func roleCard(_ title: String, subtitle: String, icon: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: icon).font(.title)
+            Text(title).font(.title3.bold()).multilineTextAlignment(.leading)
+            Text(subtitle).font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading).padding(20)
+        .background(Color(.secondarySystemBackground)).cornerRadius(16)
+        .padding(.vertical, 4)
+    }
+
+    private var watchCheck: some View {
+        page(icon: "applewatch", title: model.watchReachable ? "Watch connected" : "Pair the watch",
+             text: model.watchReachable
+                ? "Good. On the phone's Watch app, make sure \"Walking Beat\" is installed on the watch, then continue below."
+                : "Open the Watch app on this phone and install \"Walking Beat\" on the watch, or keep going and finish this later — the setup walk happens on the watch.") {
+            Text("This phone stores the walking journal and settings. The watch does the walking work.")
+                .font(.callout).foregroundStyle(.secondary)
+        }
+    }
+
+    private var tempoPage: some View {
+        TempoSetupPage(mode: .onboarding)
+    }
+
+    private var done: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "checkmark.circle.fill").font(.system(size: 72)).foregroundStyle(.green)
+            Text("Ready to walk").font(.largeTitle.bold())
+            Text(model.role == .caregiver
+                 ? "When walking (especially turns and doorways — the tricky spots), the patient opens the watch app and starts walk mode. The beat handles the rest."
+                 : "Before a walk, open the watch app and tap the big Start button. If you feel stuck, tap Help — the beat starts right away.")
+                .font(.title3).multilineTextAlignment(.center)
+            if model.role == .caregiver {
+                Text("You can come back to Settings any time to adjust the beat or share the journal with the doctor.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var navButtons: some View {
+        Group {
+            HStack(spacing: 16) {
+                if step > 0 && step != 2 {
+                    Button("Back") { withAnimation { step -= 1 } }
+                        .frame(minHeight: 56)
+                }
+                Button(step == 1 ? "Continue" : step == 3 ? "Start setup walk" : step == 5 ? "Set my beat" : "Next") {
+                    withAnimation { step += 1 }
+                }
+                .disabled(step == 1 && !agreedLimits)
+                .font(.title2.bold())
+                .frame(maxWidth: .infinity, minHeight: 60)
+                .buttonStyle(.borderedProminent)
+            }
+            if step == 6 {
+                Button("Finish") {
+                    Task { await model.requestNotificationPermission() }
+                    model.onboarded = true
+                }
+                .font(.title2.bold()).frame(maxWidth: .infinity, minHeight: 60).buttonStyle(.borderedProminent)
+            }
+        }
+    }
+
+    private func page(icon: String, title: String, text: String, @ViewBuilder content: () -> some View = { EmptyView() }) -> some View {
         VStack(spacing: 16) {
             Image(systemName: icon).font(.system(size: 64)).foregroundStyle(.tint).accessibilityHidden(true)
             Text(title).font(.largeTitle.bold()).multilineTextAlignment(.center)
-            Text(text).font(.title3).multilineTextAlignment(.center)
+            Text(text).font(.title3).multilineTextAlignment(.leading)
+            content()
+        }
+    }
+
+}
+
+// MARK: Setup walk page (shared)
+
+/// Guides the caregiver/patient through the 2-minute walk that measures cadence, and listens
+/// for the result arriving from the watch.
+struct SetupWalkPage: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "figure.walk.circle.fill").font(.system(size: 64)).foregroundStyle(.tint)
+            Text("The setup walk").font(.largeTitle.bold()).multilineTextAlignment(.center)
+            Text(model.role == .patient
+                 ? "On the watch, tap \"Set up my beat\", then walk the way you normally walk. Keep going until it says done."
+                 : "On the watch, tap \"Set up my beat\", then walk with them for 2 minutes at their normal pace. This is how the watch learns their step rate and sets a safe freeze threshold.")
+                .font(.title3).multilineTextAlignment(.center)
+            if let c = model.lastCalibration {
+                Label("Walk recorded: \(Int(c.cadenceStepsPerMin ?? 0)) steps per minute", systemImage: "checkmark.circle.fill")
+                    .font(.headline).foregroundStyle(.green).padding(.top, 8)
+                Button("Redo later in Settings") { } // noop, guidance only
+                    .font(.callout)
+            } else {
+                Label("Waiting for the watch to finish…", systemImage: "applewatch.radiowaves.left.and.right")
+                    .font(.headline).foregroundStyle(.secondary).padding(.top, 8)
+            }
+            Spacer()
+            Text("You can skip and adjust the beat by hand now; redo the walk any time in Settings — a personal setup makes false alarms much less likely.")
+                .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+        }.padding(.vertical, 12)
+    }
+}
+
+// MARK: Tempo setup (evidence-anchored)
+
+/// Caregiver picks tempo relative to the measured walking cadence. 110% is pre-selected —
+/// trials found cueing ~10% above preferred cadence reduced freezing most reliably
+/// (Arias & Cudeiro 2010; RAS review). Without a setup walk yet, falls back to a manual beat.
+struct TempoSetupPage: View {
+    enum Mode { case onboarding, settings }
+    let mode: Mode
+    @EnvironmentObject var model: AppModel
+    @StateObject private var preview = MetronomePreview()
+
+    private var cadence: Double? { model.lastCalibration?.cadenceStepsPerMin }
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "metronome").font(.system(size: 56)).foregroundStyle(.tint)
+            Text("Set the beat").font(.largeTitle.bold()).multilineTextAlignment(.center)
+            if let c = cadence {
+                Text("Setup walk measured \(Int(c)) steps per minute.").font(.title3).multilineTextAlignment(.center)
+                Picker("Speed", selection: Binding(
+                    get: { Self.nearestPercent(model.settings.bpm, cadence: c) },
+                    set: { pct in model.settings.bpm = Self.bpm(for: pct, cadence: c) })) {
+                    Text("90%").tag(90); Text("100%").tag(100); Text("110%").tag(110)
+                }
+                .pickerStyle(.segmented)
+                Text(pctCaption).font(.callout).foregroundStyle(.secondary)
+            } else {
+                Text(mode == .onboarding
+                     ? "No setup walk yet — drag to choose a comfortable beat for now; the walk will fine-tune it."
+                     : "Do the setup walk (Settings → Setup walk) to anchor the beat to their own step rate.").font(.title3)
+                Stepper(value: $model.settings.bpm, in: CueSettings.bpmRange, step: 2) {
+                    Text("\(model.settings.bpm) beats per minute").font(.title3)
+                }
+            }
+            Button(preview.playing ? "Stop" : "Hear and feel this beat") { preview.toggle(bpm: model.settings.bpm) }
+                .buttonStyle(.borderedProminent)
+            Text("In trials, a beat about 10% faster than the person's natural walking reduced freezing best. A beat that feels rushed should be turned down — comfort wins.")
+                .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+        }.padding(24).onDisappear { preview.stop() }
+    }
+
+    private var pctCaption: String {
+        switch Self.nearestPercent(model.settings.bpm, cadence: cadence!) {
+        case 90: "A little slower than normal walking. Calmest option."
+        case 100: "Exactly their own walking rhythm."
+        default: "Trials found this slightly-quicker beat reduced freezing the most."
+        }
+    }
+
+    static func nearestPercent(_ bpm: Int, cadence: Double) -> Int {
+        [90, 100, 110].min(by: { abs(Double(bpm) - Double(cadence) * Double($0) / 100) < abs(Double(bpm) - Double(cadence) * Double($1) / 100) }) ?? 110
+    }
+    static func bpm(for pct: Int, cadence: Double) -> Int {
+        max(CueSettings.bpmRange.lowerBound, min(CueSettings.bpmRange.upperBound, Int((cadence * Double(pct) / 100).rounded())))
+    }
+}
+
+private extension TempoSetupPage { // path title helper
+    var title: String { mode == .onboarding ? "Set the beat" : "Tempo" }
+}
+
+// MARK: Patient tabs
+
+struct MyBeatView: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 24) {
+                    HStack(spacing: 10) {
+                        Image(systemName: model.watchReachable ? "applewatch.radiowaves.left.and.right" : "applewatch.slash")
+                            .font(.title2)
+                        Text(model.watchReachable ? "Watch ready" : "Watch not in range").font(.title3)
+                    }.padding(.top, 8)
+                    VStack(spacing: 12) {
+                        Text("\(model.today?.cues ?? 0)").font(.system(size: 72, weight: .bold))
+                        Text(model.today?.cues == 1 ? "beat helped today" : "beats helped today").foregroundStyle(.secondary)
+                    }.padding(.vertical, 16)
+                    Text("The watch counts automatically when walk mode is on.").font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    if let c = model.lastCalibration, let cad = c.cadenceStepsPerMin {
+                        LabeledContent("Your walking rhythm", value: "\(Int(cad)) steps/min").font(.title3).padding(.horizontal)
+                    }
+                }
+            }
+            .navigationTitle("Walking Beat")
         }
     }
 }
 
-// MARK: Today
+struct HowItView: View {
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("When you feel stuck") {
+                    Text("Look at your watch and press the big Help button. The beat begins right away — step in time with it, one foot per tap.")
+                }
+                Section("How the automatic side works") {
+                    Text("During walk mode, the watch watches for the stuck moment and starts the same beat. Every start begins quietly (wrist taps).")
+                }
+                Section("If the beat started by itself") {
+                    Text("It will stop on its own when you walk again. If it started by mistake, tap Stop. Nothing bad happened.")
+                }
+            }
+            .navigationTitle("Help")
+        }
+    }
+}
+
+// MARK: Today (caregiver)
 
 struct TodayView: View {
     @EnvironmentObject var model: AppModel
@@ -115,7 +358,7 @@ struct TodayView: View {
     }
 }
 
-// MARK: Log
+// MARK: Log (caregiver)
 
 struct EventLogView: View {
     @EnvironmentObject var model: AppModel
@@ -170,11 +413,11 @@ struct EventRow: View {
     }
 }
 
-// MARK: Settings
+// MARK: Settings (caregiver)
 
 struct SettingsView: View {
     @EnvironmentObject var model: AppModel
-    @StateObject private var preview = MetronomePreview()
+    @State private var showTempoTuner = false
 
     var body: some View {
         NavigationStack {
@@ -183,12 +426,10 @@ struct SettingsView: View {
                     TextField("Name (optional)", text: $model.settings.patientName)
                 }
                 Section {
-                    Stepper(value: $model.settings.bpm, in: CueSettings.bpmRange, step: 2) {
-                        Text("\(model.settings.bpm) beats per minute").font(.title3)
-                    }
-                    Button(preview.playing ? "Stop preview" : "Hear and feel this beat") { preview.toggle(bpm: model.settings.bpm) }
+                    NavigationLink("Tune the beat") { TempoSetupPage(mode: .settings) }
+                    LabeledContent("Now", value: "\(model.settings.bpm) beats per minute")
                 } header: { Text("Beat") } footer: {
-                    Text("Best set by the watch's 2-minute setup walk, which matches this person's own step rate.")
+                    Text("Anchored to their own step rate from the setup walk. In trials, about 10% above normal walking reduced freezing the most; comfort comes first — lower it if it feels rushed.")
                 }
                 Section("How the beat is given") {
                     Picker("Cue", selection: $model.settings.mode) {
@@ -211,6 +452,14 @@ struct SettingsView: View {
                 } header: { Text("Detection") } footer: {
                     Text("\"Fewest false alarms\" is recommended to start. The Help button on the watch always works, even with detection off. Changing sensitivity clears the personal setup; repeat the setup walk afterwards.")
                 }
+                Section("Setup walk") {
+                    NavigationLink("Redo setup walk") { SetupWalkPage() }
+                    if let c = model.lastCalibration {
+                        LabeledContent("Last walk", value: c.recordedAt.formatted(date: .abbreviated, time: .shortened))
+                        if let cad = c.cadenceStepsPerMin { LabeledContent("Step rate", value: "\(Int(cad)) per min") }
+                        LabeledContent("Personalised", value: model.settings.personalConfig == nil ? "No" : "Yes")
+                    }
+                }
                 Section {
                     Toggle("Study recording", isOn: $model.settings.studyRecordingEnabled)
                     ForEach(model.studyFiles, id: \.self) { url in
@@ -222,16 +471,18 @@ struct SettingsView: View {
                 Section("Alerts") {
                     Toggle("Notify this phone when the beat starts", isOn: $model.settings.caregiverAlertsEnabled)
                 }
-                if let c = model.lastCalibration {
-                    Section("Last setup walk") {
-                        LabeledContent("Date", value: c.recordedAt.formatted(date: .abbreviated, time: .shortened))
-                        if let cad = c.cadenceStepsPerMin { LabeledContent("Step rate", value: "\(Int(cad)) per min") }
-                        LabeledContent("Personalised", value: model.settings.personalConfig == nil ? "No" : "Yes")
+                Section("App") {
+                    Picker("This phone belongs to", selection: $model.role) {
+                        Text("The person walking").tag(AppRole.patient)
+                        Text("Family / caregiver").tag(AppRole.caregiver)
                     }
+                    Text("Switch roles any time; data is shared either way.").font(.callout).foregroundStyle(.secondary)
+                }
+                Section("Share") {
+                    ShareLink(item: model.exportCSV()) { Label("Freeze journal (CSV) for the doctor", systemImage: "square.and.arrow.up") }
                 }
             }
             .navigationTitle("Settings")
-            .onDisappear { preview.stop() }
         }
     }
 }
@@ -243,20 +494,22 @@ struct AboutView: View {
         NavigationStack {
             List {
                 Section("Why a beat helps") {
-                    Text("Freezing of gait affects roughly 4 in 10 people with Parkinson's. A steady external rhythm, heard or felt, gives the brain a timing signal to step to, and has been shown in trials to improve walking and reduce freezing.")
+                    Text("Freezing of gait affects roughly 4 in 10 people with Parkinson's. A steady external rhythm, heard or felt, gives the brain a timing signal to step to, and trials have shown it improves walking and reduces freezing. The strongest results came from a beat a little quicker than natural walking — about 10% faster.")
                 }
                 Section("How detection works") {
                     Text("The watch measures wrist movement. When someone who was just walking suddenly stops stepping and the movement changes to fast trembling, and this lasts more than a moment, the beat starts. It stops by itself when walking resumes. The current detector was developed on public data from leg-worn sensors and is still being validated on the wrist.")
                 }
                 Section("Limits") {
                     Text("Detection can miss freezes, especially when starting to walk, and can occasionally start the beat when not needed. Marking each event as \"Real freeze\" or \"Not needed\" helps improve it. This app is not a medical device.")
+                    Text("Full limitation register: see docs/LIMITATIONS.md in the project repository.")
                 }
                 Section("Key research") {
                     Text("Nieuwboer et al., RESCUE trial, JNNP 2007")
+                    Text("Arias & Cudeiro, PLoS One 2010 (cueing at 110% cadence)")
                     Text("Bächlin et al., IEEE TITB 2010")
                     Text("Moore et al., J Neurosci Methods 2008")
-                    Text("Ginis et al., Ann Phys Rehabil Med 2018")
                     Text("Salomon et al., Nature Communications 2024")
+                    Text("Evidence map: docs/EVIDENCE_LOG.md in the project repository.")
                 }
             }
             .navigationTitle("About")

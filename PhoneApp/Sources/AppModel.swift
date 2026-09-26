@@ -4,6 +4,12 @@ import Foundation
 import UserNotifications
 import WatchConnectivity
 
+/// Who is holding the phone right now. Only changes presentation, never data.
+enum AppRole: String {
+    case patient
+    case caregiver
+}
+
 /// Phone-side state: settings authored by the caregiver, the event log, and alerts.
 @MainActor
 final class AppModel: NSObject, ObservableObject {
@@ -16,6 +22,12 @@ final class AppModel: NSObject, ObservableObject {
     @Published private(set) var studyFiles: [URL] = []
     @Published var onboarded: Bool {
         didSet { UserDefaults.standard.set(onboarded, forKey: "fogcue.onboarded") }
+    }
+    /// Presentation role chosen at onboarding. Same device & data either way; this only
+    /// filters tabs, wording and setup guidance. Caregivers do the setup; the patient
+    /// mostly interacts with the watch.
+    @Published var role: AppRole {
+        didSet { UserDefaults.standard.set(role.rawValue, forKey: "fogcue.role") }
     }
 
     private let eventsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -32,6 +44,7 @@ final class AppModel: NSObject, ObservableObject {
             settings = CueSettings()
         }
         onboarded = UserDefaults.standard.bool(forKey: "fogcue.onboarded")
+        role = AppRole(rawValue: UserDefaults.standard.string(forKey: "fogcue.role") ?? "") ?? .caregiver
         super.init()
         loadEvents()
         refreshStudyFiles()

@@ -11,7 +11,7 @@ settings:
     DEVELOPMENT_TEAM: 7WK6W7T5HK
     CODE_SIGN_STYLE: Automatic
     MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "1"
+    CURRENT_PROJECT_VERSION: "2"
 packages:
   FoGCore:
     path: Packages/FoGCore
@@ -30,6 +30,8 @@ targets:
       path: PhoneApp/Info.plist
       properties:
         CFBundleDisplayName: Walking Beat
+        CFBundleShortVersionString: "1.1"
+        CFBundleVersion: "2"
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIFileSharingEnabled: true

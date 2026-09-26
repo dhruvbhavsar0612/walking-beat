@@ -5,5 +5,8 @@ __pycache__/
 Packages/FoGCore/.build/
 .swiftpm/
 *.xcodeproj/
+# Full parity recordings are stored as Fixtures/*.partNN (joined by the test).
+Packages/FoGCore/Tests/FoGCoreTests/Fixtures/samples.csv
+Packages/FoGCore/Tests/FoGCoreTests/Fixtures/expected.json
 DerivedData/
 .DS_Store

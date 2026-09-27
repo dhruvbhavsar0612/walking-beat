@@ -513,6 +513,16 @@ struct SetupWalkProgressView: View {
                         .background(Color(.secondarySystemBackground))
                         .cornerRadius(12)
                     }
+                    // Numeric diagnostics: what the pipeline actually sees (sampled live).
+                    VStack(spacing: 4) {
+                        Text("samples \(service.sensorSampleCount) · windows \(service.windowsEmitted) · gait \(service.gaitWindowCount)")
+                            .font(.caption.monospacedDigit())
+                        Text(String(format: "freq %.2f Hz · loco %.5f · FI %.2f", service.lastDominantFreq, service.lastLocoPower, service.lastFreezeIndex))
+                            .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                        Text("expected: freq 0.6–2.6 Hz, loco > 0.00025")
+                            .font(.caption2).foregroundStyle(.tertiary)
+                    }
+                    .padding(.top, 4)
                 }
                 Button(role: .destructive) {
                     service.cancelSetupWalk(); dismiss()

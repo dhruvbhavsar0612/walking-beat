@@ -3,7 +3,10 @@ import CoreMotion
 import FoGCore
 import FoGKit
 import Foundation
+import os
 import UIKit
+
+private let diagLog = os.Logger(subsystem: "com.example.fogcue", category: "PhoneDetection")
 
 /// Beat cueing on the phone itself, for when no watch is paired. Audio + haptics from the
 /// handheld device. One class serves three jobs so event journaling has a single path:
@@ -50,6 +53,11 @@ final class PhoneDetectionService: ObservableObject {
     /// Total accelerometer samples received since pipeline start — 0 means the sensor is
     /// delivering nothing (almost always denied Motion & Fitness permission).
     @Published private(set) var sensorSampleCount = 0
+    /// Live per-window diagnostics for the setup-walk screen: shows what the pipeline sees.
+    @Published private(set) var windowsEmitted = 0
+    @Published private(set) var lastDominantFreq: Double = 0
+    @Published private(set) var lastLocoPower: Double = 0
+    @Published private(set) var lastFreezeIndex: Double = 0
 
     var onEvent: ((Event) -> Void)?
     var settings = CueSettings()
@@ -238,6 +246,13 @@ final class PhoneDetectionService: ObservableObject {
     private func process(_ s: AccelSample) {
         sensorSampleCount += 1
         guard let f = window?.push(s) else { return }
+        windowsEmitted += 1
+        lastDominantFreq = f.dominantFreq
+        lastLocoPower = f.locoPower
+        lastFreezeIndex = f.freezeIndex
+        if windowsEmitted % 4 == 0 {
+            diagLog.info("walk windows=\(self.windowsEmitted) freq=\(f.dominantFreq, format: .fixed(precision: 2)) loco=\(f.locoPower, format: .exponential(precision: 2)) fi=\(f.freezeIndex, format: .fixed(precision: 2)) gait=\(self.gaitWindowCount)")
+        }
         lastT = f.tEnd
         guard var d = detector else {
             if mode == .calibrating {

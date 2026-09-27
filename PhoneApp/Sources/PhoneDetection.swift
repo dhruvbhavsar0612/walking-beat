@@ -47,6 +47,9 @@ final class PhoneDetectionService: ObservableObject {
 
     /// Live gait-window count during the setup walk so the screen can show collecting progress.
     @Published private(set) var gaitWindowCount = 0
+    /// Total accelerometer samples received since pipeline start — 0 means the sensor is
+    /// delivering nothing (almost always denied Motion & Fitness permission).
+    @Published private(set) var sensorSampleCount = 0
 
     var onEvent: ((Event) -> Void)?
     var settings = CueSettings()
@@ -216,6 +219,7 @@ final class PhoneDetectionService: ObservableObject {
         startedAt = Date()
         lastT = 0
         window = SlidingWindow(windowSec: cfg.windowSec, hopSec: cfg.hopSec, sampleRate: Self.sampleRate)
+        sensorSampleCount = 0
         motion.accelerometerUpdateInterval = 1.0 / Self.sampleRate
         motion.startAccelerometerUpdates(to: queue) { [weak self] data, _ in
             guard let self, let a = data?.acceleration else { return }
@@ -232,6 +236,7 @@ final class PhoneDetectionService: ObservableObject {
     }
 
     private func process(_ s: AccelSample) {
+        sensorSampleCount += 1
         guard let f = window?.push(s) else { return }
         lastT = f.tEnd
         guard var d = detector else {

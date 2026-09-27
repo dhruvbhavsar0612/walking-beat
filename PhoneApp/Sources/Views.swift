@@ -487,13 +487,32 @@ struct SetupWalkProgressView: View {
                 Text("\(Int(service.calibrationProgress * 120)) of 120 seconds")
                     .font(.callout).foregroundStyle(.secondary)
                 // Live sampling proof: shows collection is working moment to moment.
-                HStack(spacing: 6) {
-                    Image(systemName: service.gaitWindowCount > 0 ? "waveform.path.ecg" : "waveform.slash")
-                        .foregroundStyle(service.gaitWindowCount > 0 ? Color.green : Color.orange)
-                    Text(service.gaitWindowCount > 0
-                         ? "Walk detected — \(service.gaitWindowCount) gait samples"
-                         : "Waiting for steady walking…")
-                        .font(.callout)
+                VStack(spacing: 8) {
+                    HStack(spacing: 6) {
+                        Image(systemName: service.gaitWindowCount > 0 ? "waveform.path.ecg" : "waveform.slash")
+                            .foregroundStyle(service.gaitWindowCount > 0 ? Color.green : Color.orange)
+                        Text(service.gaitWindowCount > 0
+                             ? "Walk detected — \(service.gaitWindowCount) gait samples"
+                             : "Waiting for steady walking…")
+                            .font(.callout)
+                    }
+                    if service.sensorSampleCount == 0 && service.calibrationProgress > 0.03 {
+                        VStack(spacing: 8) {
+                            Label("No motion data is arriving.", systemImage: "exclamationmark.shield.fill")
+                                .font(.callout.bold()).foregroundStyle(.red)
+                            Text("Motion & Fitness permission is probably off. Enable it, then try again.")
+                                .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                            Button("Open Settings") {
+                                if let url = URL(string: UIApplication.openSettingsURLString) {
+                                    UIApplication.shared.open(url)
+                                }
+                            }
+                            .font(.callout.bold())
+                        }
+                        .padding(12)
+                        .background(Color(.secondarySystemBackground))
+                        .cornerRadius(12)
+                    }
                 }
                 Button(role: .destructive) {
                     service.cancelSetupWalk(); dismiss()

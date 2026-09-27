@@ -11,7 +11,9 @@ public enum Calibration {
         public let gaitWindows: Int
     }
 
-    static func gaitLike(_ f: WindowFeatures, _ cfg: DetectorConfig) -> Bool {
+    /// True when a window looks like normal walking (used for calibration filtering and
+    /// live walk feedback). Public so phone/watch UIs can show gait liveness.
+    public static func gaitLike(_ f: WindowFeatures, _ cfg: DetectorConfig) -> Bool {
         f.dominantFreq >= cfg.walkFreqMin && f.dominantFreq <= cfg.walkFreqMax && f.locoPower >= cfg.walkPowerMin * 0.25
     }
 

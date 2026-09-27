@@ -480,12 +480,21 @@ struct SetupWalkProgressView: View {
             } else {
                 Image(systemName: "figure.walk.circle.fill").font(.system(size: 64)).foregroundStyle(.tint)
                 Text("Walk normally for 2 minutes").font(.largeTitle.bold()).multilineTextAlignment(.center)
-                Text("Keep this phone with you — hand, pocket, or bag. The watch app does the same thing; either one works.")
+                Text("Swing your arm naturally or keep the phone in a pocket — a steady, walking pace is what registers. Holding the phone still will not.")
                     .font(.title3).multilineTextAlignment(.center)
                 ProgressView(value: service.calibrationProgress)
                     .accessibilityLabel("Setup walk progress")
                 Text("\(Int(service.calibrationProgress * 120)) of 120 seconds")
                     .font(.callout).foregroundStyle(.secondary)
+                // Live sampling proof: shows collection is working moment to moment.
+                HStack(spacing: 6) {
+                    Image(systemName: service.gaitWindowCount > 0 ? "waveform.path.ecg" : "waveform.slash")
+                        .foregroundStyle(service.gaitWindowCount > 0 ? Color.green : Color.orange)
+                    Text(service.gaitWindowCount > 0
+                         ? "Walk detected — \(service.gaitWindowCount) gait samples"
+                         : "Waiting for steady walking…")
+                        .font(.callout)
+                }
                 Button(role: .destructive) {
                     service.cancelSetupWalk(); dismiss()
                 } label: { Text("Cancel").frame(minHeight: 52) }
@@ -505,16 +514,19 @@ struct SetupWalkProgressView: View {
             }
         }
         .onChange(of: service.calibrationProgress) { progress in
-            guard progress >= 1, resultMessage == nil else { return }
-            let res = service.finishSetupWalk()
-            if res.ok {
-                let cad = res.cadence.map { " at \(Int($0)) steps per minute" } ?? ""
+            // Completion is now fired by the service (calibrationResult publisher).
+            let _ = progress
+        }
+        .onReceive(service.$calibrationResult) { result in
+            guard let result, resultMessage == nil else { return }
+            if result.ok {
+                let cad = result.cadence.map { " at \(Int($0)) steps per minute" } ?? ""
                 resultMessage = "Walk recorded\(cad). The beat and thresholds are personalised."
                 if let upload = phoneBeat.lastCalibration {
                     model.receive(SyncMessage.calibrationSamples(upload))
                 }
             } else {
-                resultMessage = "Not enough walking was detected. Try again at a normal pace."
+                resultMessage = "Not enough steady walking was detected. Try again at a normal, unhurried pace."
             }
         }
     }

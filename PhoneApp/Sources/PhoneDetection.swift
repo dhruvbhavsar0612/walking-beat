@@ -41,6 +41,12 @@ final class PhoneDetectionService: ObservableObject {
     @Published private(set) var mode: Mode = .idle
     @Published private(set) var calibrationProgress: Double = 0
     @Published private(set) var beatActive = false
+    /// Distinct completion signal fired by the service itself — the view never has to catch
+    /// a progress tick to know the walk is done.
+    @Published private(set) var calibrationResult: (ok: Bool, cadence: Double?)?
+
+    /// Live gait-window count during the setup walk so the screen can show collecting progress.
+    @Published private(set) var gaitWindowCount = 0
 
     var onEvent: ((Event) -> Void)?
     var settings = CueSettings()
@@ -139,8 +145,12 @@ final class PhoneDetectionService: ObservableObject {
         calibrationProgressTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, let start = self.calibrationStart else { return }
-                self.calibrationProgress = min(1, Date().timeIntervalSince(start) / Self.calibrationSec)
-                if self.calibrationProgress >= 1 { self.finishSetupWalk() }
+                let elapsed = Date().timeIntervalSince(start)
+                self.calibrationProgress = min(0.999, elapsed / Self.calibrationSec) // completion is event-driven, not percent-triggered
+                if elapsed >= Self.calibrationSec {
+                    self.calibrationProgress = 1
+                    self.finishSetupWalk()
+                }
             }
         }
     }
@@ -154,6 +164,7 @@ final class PhoneDetectionService: ObservableObject {
         calibrationWindows = []
         calibrationStart = nil
         calibrationProgress = 0
+        gaitWindowCount = 0
         mode = .idle
     }
 
@@ -173,15 +184,23 @@ final class PhoneDetectionService: ObservableObject {
         }()
         calibrationStart = nil
         mode = .idle
-        guard let profiles = try? DetectorProfiles.bundled() else { return (false, cadence) }
+        defer {
+            calibrationWindows = []
+            calibrationProgress = 0
+            gaitWindowCount = 0
+        }
+        guard let profiles = try? DetectorProfiles.bundled() else {
+            calibrationResult = (false, cadence)
+            onEvent?(.calibrationFinished(ok: false, cadence: cadence, windows: []))
+            return (false, cadence)
+        }
         let base = profiles.config(for: settings.sensitivity)
         let result = Calibration.calibrate(walk: calibrationWindows, base: base, model: profiles.model)
         if result.ok {
             settings.personalConfig = result.config
             if let c = cadence { settings.bpm = CadencePolicy.recommendedBPM(cadenceStepsPerMin: c) }
         }
-        calibrationWindows = []
-        calibrationProgress = 0
+        calibrationResult = (result.ok, cadence)
         onEvent?(.calibrationFinished(ok: result.ok, cadence: cadence, windows: windowsSnapshot))
         return (result.ok, cadence)
     }
@@ -216,7 +235,11 @@ final class PhoneDetectionService: ObservableObject {
         guard let f = window?.push(s) else { return }
         lastT = f.tEnd
         guard var d = detector else {
-            if mode == .calibrating { calibrationWindows.append(f) }
+            if mode == .calibrating {
+                calibrationWindows.append(f)
+                let cfg = DetectorConfig()
+                if Calibration.gaitLike(f, cfg) { gaitWindowCount += 1 }
+            }
             return
         }
         let out = d.update(f)

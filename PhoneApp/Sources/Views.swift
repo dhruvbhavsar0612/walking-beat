@@ -91,6 +91,7 @@ struct OnboardingView: View {
             navButtons
         }
         .padding(24)
+        .onAppear { step = min(max(step, 0), 6) }
     }
 
     private var progress: some View {
@@ -171,25 +172,30 @@ struct OnboardingView: View {
 
     private var navButtons: some View {
         Group {
-            HStack(spacing: 16) {
-                if step > 0 && step != 2 {
-                    Button("Back") { withAnimation { step -= 1 } }
-                        .frame(minHeight: 56)
+            if step < 6 {
+                HStack(spacing: 16) {
+                    if step > 0 && step != 2 {
+                        Button("Back") { withAnimation { step = max(step - 1, 0) } }
+                            .frame(minHeight: 56)
+                    }
+                    Button(step == 1 ? "Continue" : step == 3 ? "Start setup walk" : step == 5 ? "Set my beat" : "Next") {
+                        withAnimation { step = min(step + 1, 6) }
+                    }
+                    .disabled(step == 1 && !agreedLimits)
+                    .font(.title2.bold())
+                    .frame(maxWidth: .infinity, minHeight: 60)
+                    .buttonStyle(.borderedProminent)
                 }
-                Button(step == 1 ? "Continue" : step == 3 ? "Start setup walk" : step == 5 ? "Set my beat" : "Next") {
-                    withAnimation { step += 1 }
-                }
-                .disabled(step == 1 && !agreedLimits)
-                .font(.title2.bold())
-                .frame(maxWidth: .infinity, minHeight: 60)
-                .buttonStyle(.borderedProminent)
-            }
-            if step == 6 {
+            } else {
                 Button("Finish") {
                     Task { await model.requestNotificationPermission() }
                     model.onboarded = true
                 }
-                .font(.title2.bold()).frame(maxWidth: .infinity, minHeight: 60).buttonStyle(.borderedProminent)
+                .font(.title2.bold())
+                .frame(maxWidth: .infinity, minHeight: 60)
+                .buttonStyle(.borderedProminent)
+                Button("Back") { withAnimation { step = 5 } }
+                    .frame(maxWidth: .infinity, minHeight: 52)
             }
         }
     }

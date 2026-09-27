@@ -477,7 +477,7 @@ struct SetupWalkProgressView: View {
                 Text(msg).font(.title3).multilineTextAlignment(.center)
                 Button("Done") { dismiss() }
                     .buttonStyle(.borderedProminent).frame(minHeight: 56)
-            } else {
+            } else if service.mode == .calibrating {
                 Image(systemName: "figure.walk.circle.fill").font(.system(size: 64)).foregroundStyle(.tint)
                 Text("Walk normally for 2 minutes").font(.largeTitle.bold()).multilineTextAlignment(.center)
                 Text("Swing your arm naturally or keep the phone in a pocket — a steady, walking pace is what registers. Holding the phone still will not.")
@@ -535,6 +535,17 @@ struct SetupWalkProgressView: View {
                     service.cancelSetupWalk(); dismiss()
                 } label: { Text("Cancel").frame(minHeight: 52) }
                     .buttonStyle(.bordered)
+            } else {
+                // Pre-start state: instructions only; the Start button lives in the bottom bar.
+                Image(systemName: "figure.walk.circle").font(.system(size: 64)).foregroundStyle(.tint)
+                Text("The setup walk").font(.largeTitle.bold()).multilineTextAlignment(.center)
+                Text("Two minutes of normal walking teaches the app this person's step rate and raises the freeze threshold above their everyday gait. Do it now, or later from Settings.")
+                    .font(.title3).multilineTextAlignment(.center)
+                if let err = service.lastError {
+                    Label(err, systemImage: "xmark.octagon.fill")
+                        .font(.callout.bold()).foregroundStyle(.red)
+                        .multilineTextAlignment(.center)
+                }
             }
             Spacer()
         }

@@ -1,3 +1,4 @@
+import Combine
 import FoGCore
 import FoGKit
 import Foundation
@@ -27,11 +28,19 @@ final class PhoneBeatHost: ObservableObject {
     private weak var model: AppModel?
     private var manualEvent: (id: UUID, start: Date)?
     private var autoEventId: UUID?
+    private var cancellables = Set<AnyCancellable>()
 
     init() {
         service.onEvent = { [weak self] event in
             Task { @MainActor in self?.handle(event) }
         }
+        // CRITICAL bridge: views observe the HOST, but the live counters live on the nested
+        // service. Without forwarding, SwiftUI never re-renders when service state changes —
+        // the screen froze at zeros while detection actually ran (the whole v4-v11 saga).
+        service.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
     }
 
     func attach(_ model: AppModel) {

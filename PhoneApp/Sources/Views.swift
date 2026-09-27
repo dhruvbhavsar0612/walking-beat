@@ -5,7 +5,7 @@ import SwiftUI
 @main
 struct FoGCuePhoneApp: App {
     @StateObject private var model = AppModel()
-    @StateObject private var phoneBeat = PhoneBeatController()
+    @StateObject private var phoneBeat = PhoneBeatHost()
 
     var body: some Scene {
         WindowGroup {
@@ -301,7 +301,7 @@ private extension TempoSetupPage { // path title helper
 
 struct MyBeatView: View {
     @EnvironmentObject var model: AppModel
-    @EnvironmentObject var phoneBeat: PhoneBeatController
+    @EnvironmentObject var phoneBeat: PhoneBeatHost
 
     var body: some View {
         NavigationStack {
@@ -313,13 +313,16 @@ struct MyBeatView: View {
                         Text(model.watchReachable ? "Watch ready" : "Beat runs on this phone").font(.title3)
                     }.padding(.top, 8)
 
-                    // Phone-only fallback: rhythm from the device in hand. Same journal event.
-                    if phoneBeat.active {
+                    if phoneBeat.service.beatActive {
                         VStack(spacing: 16) {
                             Image(systemName: "metronome.fill").font(.system(size: 56)).foregroundStyle(.tint)
                             Text("Beat playing — step in time").font(.headline)
                             Button {
-                                phoneBeat.stop()
+                                switch phoneBeat.service.mode {
+                                case .manualBeat: phoneBeat.service.stopManualBeat()
+                                case .walkMode: phoneBeat.service.stopWalkMode()
+                                default: break
+                                }
                             } label: {
                                 Text("Stop the beat").font(.title3.bold())
                                     .frame(maxWidth: .infinity, minHeight: 72)
@@ -327,8 +330,9 @@ struct MyBeatView: View {
                             .buttonStyle(.borderedProminent).tint(.red)
                         }
                     } else {
+                        // Manual help — always available.
                         Button {
-                            phoneBeat.start()
+                            phoneBeat.service.startManualBeat()
                         } label: {
                             VStack(spacing: 6) {
                                 Image(systemName: "metronome").font(.largeTitle)
@@ -338,6 +342,20 @@ struct MyBeatView: View {
                             .frame(maxWidth: .infinity, minHeight: 96)
                         }
                         .buttonStyle(.borderedProminent)
+
+                        // Walk mode: automatic detection on the phone (pocket placement).
+                        NavigationLink {
+                            PhoneWalkModeView()
+                        } label: {
+                            VStack(spacing: 6) {
+                                Image(systemName: "figure.walk").font(.largeTitle)
+                                Text("Walk mode").font(.title3.bold())
+                                Text("detect freezes here — keep the phone in a pocket").font(.callout)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 84)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(!phoneBeat.service.isAvailable)
                     }
 
                     VStack(spacing: 12) {
@@ -352,6 +370,135 @@ struct MyBeatView: View {
                 }.padding(.horizontal)
             }
             .navigationTitle("Walking Beat")
+        }
+    }
+}
+
+/// Phone-side walk mode: foreground automatic detection using the same FoGCore pipeline the
+/// watch runs. A phone in a pocket is the placement our model was validated on (thigh data).
+struct PhoneWalkModeView: View {
+    @EnvironmentObject var model: AppModel
+    @EnvironmentObject var phoneBeat: PhoneBeatHost
+    @Environment(\.dismiss) private var dismiss
+    @State private var showStopConfirm = false
+
+    private var service: PhoneDetectionService { phoneBeat.service }
+
+    var body: some View {
+        VStack(spacing: 24) {
+            switch service.mode {
+            case .idle:
+                VStack(spacing: 16) {
+                    Image(systemName: "figure.walk.circle").font(.system(size: 64)).foregroundStyle(.tint)
+                    Text("Walk mode").font(.largeTitle.bold()).multilineTextAlignment(.center)
+                    Text("Put this phone in a pocket (not a loose hand), then start. It listens for a sudden stop-and-tremble while walking and starts the beat if one happens. Keep the screen on while walking.")
+                        .font(.title3).multilineTextAlignment(.center)
+                    Button {
+                        service.settings = model.settings
+                        service.startWalkMode()
+                    } label: {
+                        Text("Start walk mode").font(.title2.bold()).frame(maxWidth: .infinity, minHeight: 64)
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            case .walkMode(let active):
+                VStack(spacing: 20) {
+                    Image(systemName: active ? "waveform.path.ecg" : "waveform.slash").font(.system(size: 56)).foregroundStyle(active ? .green : .secondary)
+                    Text(active ? "Listening while you walk" : "Detection unavailable").font(.title2.bold())
+                    if service.beatActive {
+                        Text("Beat playing — step in time; it stops itself when walking resumes").font(.headline).multilineTextAlignment(.center)
+                        Button {
+                            service.stopWalkMode()
+                        } label: {
+                            Text("Stop the beat").font(.title3.bold()).frame(maxWidth: .infinity, minHeight: 72)
+                        }
+                        .buttonStyle(.borderedProminent).tint(.red)
+                    } else {
+                        Text("Keep the phone in a pocket. Turn it off before sitting down — it only watches while walking.")
+                            .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    }
+                    Button(role: .destructive) {
+                        showStopConfirm = true
+                    } label: {
+                        Text("End walk mode").frame(maxWidth: .infinity, minHeight: 56)
+                    }
+                    .buttonStyle(.bordered)
+                }
+            default: EmptyView()
+            }
+            Spacer()
+        }
+        .padding(24)
+        .navigationTitle("Walk mode")
+        .navigationBarTitleDisplayMode(.inline)
+        .alert("End walk mode?", isPresented: $showStopConfirm) {
+            Button("End", role: .destructive) { service.stopWalkMode(); dismiss() }
+            Button("Keep going", role: .cancel) {}
+        } message: {
+            Text("Automatic detection and its beat stop now; the Help button always stays available.")
+        }
+        .onDisappear {
+            if case .walkMode = service.mode { service.stopWalkMode() }
+        }
+    }
+}
+
+/// Guided 2-minute setup walk on the phone: collects the same calibration windows and cadence
+/// the watch's setup walk does, then runs the identical Calibration.calibrate.
+struct SetupWalkProgressView: View {
+    @EnvironmentObject var model: AppModel
+    @EnvironmentObject var phoneBeat: PhoneBeatHost
+    @Environment(\.dismiss) private var dismiss
+    @State private var resultMessage: String?
+
+    private var service: PhoneDetectionService { phoneBeat.service }
+
+    var body: some View {
+        VStack(spacing: 20) {
+            if let msg = resultMessage {
+                Image(systemName: msg.contains("recorded") ? "checkmark.circle.fill" : "exclamationmark.triangle")
+                    .font(.system(size: 64))
+                    .foregroundStyle(msg.contains("recorded") ? Color.green : Color.orange)
+                Text(msg).font(.title3).multilineTextAlignment(.center)
+                Button("Done") { dismiss() }
+                    .buttonStyle(.borderedProminent).frame(minHeight: 56)
+            } else {
+                Image(systemName: "figure.walk.circle.fill").font(.system(size: 64)).foregroundStyle(.tint)
+                Text("Walk normally for 2 minutes").font(.largeTitle.bold()).multilineTextAlignment(.center)
+                Text("Keep this phone with you — hand, pocket, or bag. The watch app does the same thing; either one works.")
+                    .font(.title3).multilineTextAlignment(.center)
+                ProgressView(value: service.calibrationProgress)
+                    .accessibilityLabel("Setup walk progress")
+                Text("\(Int(service.calibrationProgress * 120)) of 120 seconds")
+                    .font(.callout).foregroundStyle(.secondary)
+                Button(role: .destructive) {
+                    service.cancelSetupWalk(); dismiss()
+                } label: { Text("Cancel").frame(minHeight: 52) }
+                    .buttonStyle(.bordered)
+            }
+            Spacer()
+        }
+        .padding(24)
+        .navigationTitle("Setup walk")
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            if service.mode != .calibrating && resultMessage == nil {
+                service.settings = model.settings
+                service.startSetupWalk()
+            }
+        }
+        .onChange(of: service.calibrationProgress) { progress in
+            guard progress >= 1, resultMessage == nil else { return }
+            let res = service.finishSetupWalk()
+            if res.ok {
+                let cad = res.cadence.map { " at \(Int($0)) steps per minute" } ?? ""
+                resultMessage = "Walk recorded\(cad). The beat and thresholds are personalised."
+                if let upload = phoneBeat.lastCalibration {
+                    model.receive(SyncMessage.calibrationSamples(upload))
+                }
+            } else {
+                resultMessage = "Not enough walking was detected. Try again at a normal pace."
+            }
         }
     }
 }
@@ -512,7 +659,7 @@ struct SettingsView: View {
                     Text("\"Fewest false alarms\" is recommended to start. The Help button on the watch always works, even with detection off. Changing sensitivity clears the personal setup; repeat the setup walk afterwards.")
                 }
                 Section("Setup walk") {
-                    NavigationLink("Redo setup walk") { SetupWalkPage() }
+                    NavigationLink("Redo setup walk on this phone") { SetupWalkProgressView() }
                     if let c = model.lastCalibration {
                         LabeledContent("Last walk", value: c.recordedAt.formatted(date: .abbreviated, time: .shortened))
                         if let cad = c.cadenceStepsPerMin { LabeledContent("Step rate", value: "\(Int(cad)) per min") }

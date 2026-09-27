@@ -104,6 +104,30 @@ adaptation + real wrist data is the main lever, not better generic ML.
 5. Patentability bar to check: is 1-3 combined "non-obvious"? Get a patentability opinion only
    if phase 2/3 data shows the moat is real. Trade-secret the calibration internals meanwhile.
 
+## v4 — phone detection parity (2026-09-27, branch `v4-phone-detection`)
+
+Phone now mirrors the watch's core abilities without any watch:
+
+- **Automatic detection on the phone** (`PhoneApp/Sources/PhoneDetection.swift`):
+  `CMMotionManager` 64 Hz → same `SlidingWindow`/`FeatureExtractor`/`FoGDetector` from FoGCore
+  (zero detection-math changes) → beat (audio click + haptic at settings.bpm). Rationale: a
+  pocketed phone is the closest consumer stand-in for the thigh placement the model was
+  trained/validated on — our best-evidence automatic configuration.
+- **Walk mode UI** (`PhoneWalkModeView`): foreground-only by iOS design (documented), confirm-to-end,
+  pocket guidance text.
+- **Setup walk on the phone** (`SetupWalkProgressView`): 120 s guided walk, CMPedometer cadence,
+  then the identical `Calibration.calibrate` → personal detector config + recommended BPM —
+  same path as watch calibration. Phone- and watch-calibration products are interchangeable.
+- **PhoneBeatHost** bridges all service events into the journal/alerts path, so manual beats,
+  auto cues, and calibrations land in the caregiver log exactly like watch events.
+- v4 = build 4, CFBundleShortVersionString 1.3; branch `v4-phone-detection` on GitHub (merge to
+  main after on-device verification).
+
+Known phone-detection limits (see LIMITATIONS.md):
+- Foreground-only (iOS): screen must stay on during walks; beat audio continues if locked.
+- Placement matters: pocket, not loose hand; guidance text says so.
+- No study-recording on phone yet (watch only).
+
 ## Evidence & limitations tracking (added 2026-09-26 evening)
 
 - **docs/EVIDENCE_LOG.md** — every user-facing claim → numbered citation + strength (Strong /

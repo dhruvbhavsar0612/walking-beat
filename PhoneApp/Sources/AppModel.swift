@@ -17,44 +17,63 @@ extension Notification.Name {
     static let stopPhoneBeat = Notification.Name("fogcue.stopPhoneBeat")
 }
 
-/// Phone-only cueing fallback: when no watch is paired/in range, the phone itself taps and
-/// plays the beat, and still logs the event so the journal stays complete. Detection stays
-/// watch-only; this covers the "Help me walk" path everywhere.
+/// Bridges PhoneDetectionService into the phone's journaling/alerts path, so a beat started
+/// on the phone (manual or automatic) lands in the caregiver log exactly like a watch event.
 @MainActor
-final class PhoneBeatController: ObservableObject {
-    @Published private(set) var active = false
-    private let preview = MetronomePreview()
-    private var startedAt: Date?
-    private var eventId: UUID?
+final class PhoneBeatHost: ObservableObject {
+    let service = PhoneDetectionService()
+    @Published private(set) var lastCalibration: CalibrationUpload?
+
     private weak var model: AppModel?
+    private var manualEvent: (id: UUID, start: Date)?
+    private var autoEventId: UUID?
 
-    func attach(_ model: AppModel) { self.model = model }
-
-    func toggle() {
-        active ? stop() : start()
+    init() {
+        service.onEvent = { [weak self] event in
+            Task { @MainActor in self?.handle(event) }
+        }
     }
 
-    func start() {
+    func attach(_ model: AppModel) {
+        self.model = model
+        service.settings = model.settings
+    }
+
+    private func handle(_ event: PhoneDetectionService.Event) {
         guard let model else { return }
-        let id = UUID()
-        eventId = id
-        startedAt = Date()
-        active = true
-        let e = FoGEventRecord(id: id, start: startedAt!, source: .manual)
-        model.receive(SyncMessage.eventStarted(e)) // journal + caregiver alert path, same as watch
-        preview.start(bpm: model.settings.bpm)
-    }
-
-    func stop(endReason: CueEndReason = .manual) {
-        guard active, let model, let id = eventId, let start = startedAt else { return }
-        preview.stop()
-        active = false
-        let end = Date()
-        var e = FoGEventRecord(id: id, start: start, end: end, source: .manual, endReason: endReason)
-        e.label = model.events.first(where: { $0.id == id })?.label ?? .unlabeled
-        model.receive(SyncMessage.eventEnded(e))
-        eventId = nil
-        startedAt = nil
+        service.settings = model.settings // keep tempo/sensitivity in sync each event
+        switch event {
+        case .manualBeatStarted(let id):
+            manualEvent = (id, Date())
+            let e = FoGEventRecord(id: id, start: Date(), source: .manual)
+            model.receive(SyncMessage.eventStarted(e)) // journal + caregiver alert path, same as watch
+        case .manualBeatEnded(let id, let start, let end, let reason):
+            manualEvent = nil
+            var e = FoGEventRecord(id: id, start: start, end: end, source: .manual, endReason: reason)
+            e.label = model.events.first(where: { $0.id == id })?.label ?? .unlabeled
+            model.receive(SyncMessage.eventEnded(e))
+        case .cueStarted(let d):
+            let id = UUID()
+            autoEventId = id
+            let start = service.absoluteTime(for: d.confirmedT)
+            let e = FoGEventRecord(id: id, start: start, source: .automatic, peakScore: d.peakScore)
+            model.receive(SyncMessage.eventStarted(e))
+        case .cueEnded(let d, let reason):
+            guard let id = autoEventId else { return }
+            autoEventId = nil
+            let start = service.absoluteTime(for: d.confirmedT)
+            let end = service.absoluteTime(for: d.endT ?? d.confirmedT)
+            let e = FoGEventRecord(id: id, start: start, end: end, source: .automatic, endReason: reason, peakScore: d.peakScore)
+            model.receive(SyncMessage.eventEnded(e))
+        case .calibrationFinished(let ok, let cadence, let windows):
+            guard ok else { return }
+            let upload = CalibrationUpload(recordedAt: Date(), cadenceStepsPerMin: cadence, features: windows)
+            lastCalibration = upload
+            model.receive(SyncMessage.calibrationSamples(upload))
+        case .unavailable(let message):
+            // surfaced by the UI through service availability checks; nothing to journal
+            _ = message
+        }
     }
 }
 

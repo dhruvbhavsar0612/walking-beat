@@ -45,7 +45,7 @@ final class MetronomePreview: ObservableObject {
     }
 
     /// 50 ms decaying 1 kHz click as an in-memory WAV, so the app ships no audio assets.
-    static func clickWAV(sampleRate: Int = 44_100) -> Data {
+    nonisolated static func clickWAV(sampleRate: Int = 44_100) -> Data {
         let n = sampleRate / 20
         var pcm = Data(capacity: n * 2)
         for i in 0..<n {

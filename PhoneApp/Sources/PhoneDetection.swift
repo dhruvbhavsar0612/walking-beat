@@ -58,6 +58,8 @@ final class PhoneDetectionService: ObservableObject {
     @Published private(set) var lastDominantFreq: Double = 0
     @Published private(set) var lastLocoPower: Double = 0
     @Published private(set) var lastFreezeIndex: Double = 0
+    /// Last failure that aborted a start attempt — surfaced in the UI, never silent.
+    @Published private(set) var lastError: String?
 
     var onEvent: ((Event) -> Void)?
     var settings = CueSettings()
@@ -130,7 +132,18 @@ final class PhoneDetectionService: ObservableObject {
     // MARK: Setup walk
 
     func startSetupWalk() {
-        guard isAvailable else { onEvent?(.unavailable("Motion sensor unavailable")); return }
+        diagLog.info("startSetupWalk enter: isAvailable=\(self.isAvailable) mode=\(String(describing: self.mode))")
+        if mode == .calibrating { // restart-safe: a stale abandoned walk must not block a new one
+            diagLog.info("startSetupWalk: cancelling stale calibration first")
+            cancelSetupWalk()
+        }
+        lastError = nil
+        guard isAvailable else {
+            lastError = "Motion sensor reported unavailable on this device."
+            diagLog.error("startSetupWalk ABORT: isAccelerometerAvailable=false")
+            onEvent?(.unavailable(lastError!))
+            return
+        }
         calibrationStart = Date()
         calibrationWindows = []
         cadenceSamples = []
@@ -228,6 +241,8 @@ final class PhoneDetectionService: ObservableObject {
         lastT = 0
         window = SlidingWindow(windowSec: cfg.windowSec, hopSec: cfg.hopSec, sampleRate: Self.sampleRate)
         sensorSampleCount = 0
+        windowsEmitted = 0
+        gaitWindowCount = 0
         motion.accelerometerUpdateInterval = 1.0 / Self.sampleRate
         motion.startAccelerometerUpdates(to: queue) { [weak self] data, _ in
             guard let self, let a = data?.acceleration else { return }
@@ -235,6 +250,7 @@ final class PhoneDetectionService: ObservableObject {
                 self?.process(AccelSample(x: a.x, y: a.y, z: a.z))
             }
         }
+        diagLog.info("pipeline started (detector=\(newDetector != nil))")
     }
 
     private func stopPipeline() {

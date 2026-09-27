@@ -514,7 +514,14 @@ struct SetupWalkProgressView: View {
                         .cornerRadius(12)
                     }
                     // Numeric diagnostics: what the pipeline actually sees (sampled live).
+                    if let err = service.lastError {
+                        Label(err, systemImage: "xmark.octagon.fill")
+                            .font(.callout.bold()).foregroundStyle(.red)
+                            .multilineTextAlignment(.center)
+                    }
                     VStack(spacing: 4) {
+                        Text("mode \(String(describing: service.mode))")
+                            .font(.caption2.monospaced()).foregroundStyle(.tertiary)
                         Text("samples \(service.sensorSampleCount) · windows \(service.windowsEmitted) · gait \(service.gaitWindowCount)")
                             .font(.caption.monospacedDigit())
                         Text(String(format: "freq %.2f Hz · loco %.5f · FI %.2f", service.lastDominantFreq, service.lastLocoPower, service.lastFreezeIndex))

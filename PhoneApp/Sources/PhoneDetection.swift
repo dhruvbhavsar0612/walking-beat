@@ -223,7 +223,11 @@ final class PhoneDetectionService: ObservableObject {
         let result = Calibration.calibrate(walk: calibrationWindows, base: base, model: profiles.model)
         if result.ok {
             settings.personalConfig = result.config
-            if let c = cadence { settings.bpm = CadencePolicy.recommendedBPM(cadenceStepsPerMin: c) }
+            if let c = cadence {
+                // RAS evidence (EVIDENCE_LOG E7): cueing ~10% above preferred cadence reduced
+                // freezing most reliably. Personalise, then nudge above their own rhythm.
+                settings.bpm = CadencePolicy.recommendedBPM(cadenceStepsPerMin: c, offsetPercent: 10)
+            }
         }
         calibrationResult = (result.ok, cadence)
         onEvent?(.calibrationFinished(ok: result.ok, cadence: cadence, windows: windowsSnapshot))

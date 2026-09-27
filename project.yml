@@ -30,8 +30,8 @@ targets:
       path: PhoneApp/Info.plist
       properties:
         CFBundleDisplayName: Walking Beat
-        CFBundleShortVersionString: "2.1"
-        CFBundleVersion: "12"
+        CFBundleShortVersionString: "2.2"
+        CFBundleVersion: "13"
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIFileSharingEnabled: true

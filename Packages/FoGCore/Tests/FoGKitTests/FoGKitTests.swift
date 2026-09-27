@@ -27,7 +27,7 @@ final class FoGKitTests: XCTestCase {
 
     func testBPMClampedAndRecommended() {
         XCTAssertEqual(CueSettings(bpm: 300).bpm, 140)
-        XCTAssertEqual(CadencePolicy.recommendedBPM(cadenceStepsPerMin: 104), 104)
+        XCTAssertEqual(CadencePolicy.recommendedBPM(cadenceStepsPerMin: 104, offsetPercent: 10), 114)
         XCTAssertEqual(CadencePolicy.recommendedBPM(cadenceStepsPerMin: 100, offsetPercent: -10), 90)
         XCTAssertEqual(CadencePolicy.recommendedBPM(cadenceStepsPerMin: nil), 100)
         XCTAssertEqual(CadencePolicy.recommendedBPM(cadenceStepsPerMin: 20), 100)

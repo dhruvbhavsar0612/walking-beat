@@ -159,7 +159,10 @@ final class FreezeCoordinator: ObservableObject {
         var s = settings
         if result.ok {
             s.personalConfig = result.config
-            if let cadence { s.bpm = CadencePolicy.recommendedBPM(cadenceStepsPerMin: cadence) }
+            if let cadence {
+                // Same 110% evidence-anchored tempo as the phone path (EVIDENCE_LOG E7).
+                s.bpm = CadencePolicy.recommendedBPM(cadenceStepsPerMin: cadence, offsetPercent: 10)
+            }
             calibrationMessage = "Done. Beat set to \(s.bpm) per minute."
         } else {
             calibrationMessage = "Not enough walking was detected. Please try again and walk at a normal pace."

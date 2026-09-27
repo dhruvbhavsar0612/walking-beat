@@ -132,15 +132,15 @@ final class PhoneDetectionService: ObservableObject {
     // MARK: Setup walk
 
     func startSetupWalk() {
-        diagLog.info("startSetupWalk enter: isAvailable=\(self.isAvailable) mode=\(String(describing: self.mode))")
+        diagLog.info("startSetupWalk enter: isAvailable=\(self.isAvailable) deviceMotionAvailable=\(self.motion.isDeviceMotionAvailable) mode=\(String(describing: self.mode))")
         if mode == .calibrating { // restart-safe: a stale abandoned walk must not block a new one
             diagLog.info("startSetupWalk: cancelling stale calibration first")
             cancelSetupWalk()
         }
         lastError = nil
-        guard isAvailable else {
-            lastError = "Motion sensor reported unavailable on this device."
-            diagLog.error("startSetupWalk ABORT: isAccelerometerAvailable=false")
+        guard motion.isAccelerometerAvailable || motion.isDeviceMotionAvailable else {
+            lastError = "No motion sensor is available to this app right now."
+            diagLog.error("startSetupWalk ABORT: no accelerometer and no device motion")
             onEvent?(.unavailable(lastError!))
             return
         }
@@ -244,13 +244,29 @@ final class PhoneDetectionService: ObservableObject {
         windowsEmitted = 0
         gaitWindowCount = 0
         motion.accelerometerUpdateInterval = 1.0 / Self.sampleRate
-        motion.startAccelerometerUpdates(to: queue) { [weak self] data, _ in
-            guard let self, let a = data?.acceleration else { return }
-            Task { @MainActor [weak self] in
-                self?.process(AccelSample(x: a.x, y: a.y, z: a.z))
+        if motion.isAccelerometerAvailable {
+            motion.startAccelerometerUpdates(to: queue) { [weak self] data, _ in
+                guard let self, let a = data?.acceleration else { return }
+                Task { @MainActor [weak self] in
+                    self?.process(AccelSample(x: a.x, y: a.y, z: a.z))
+                }
             }
+            diagLog.info("pipeline started: raw accelerometer source (detector=\(newDetector != nil))")
+        } else if motion.isDeviceMotionAvailable {
+            // Fallback: userAcceleration is gravity-removed acceleration in G — actually the
+            // closer match to the gravity-free Daphnet acc_g data the model was trained on.
+            motion.deviceMotionUpdateInterval = 1.0 / Self.sampleRate
+            motion.startDeviceMotionUpdates(to: queue) { [weak self] data, _ in
+                guard let self, let u = data?.userAcceleration else { return }
+                Task { @MainActor [weak self] in
+                    self?.process(AccelSample(x: u.x, y: u.y, z: u.z))
+                }
+            }
+            diagLog.info("pipeline started: device-motion userAcceleration source (detector=\(newDetector != nil))")
+        } else {
+            diagLog.error("pipeline NOT started: no motion source available")
+            onEvent?(.unavailable("No motion source available"))
         }
-        diagLog.info("pipeline started (detector=\(newDetector != nil))")
     }
 
     private func stopPipeline() {

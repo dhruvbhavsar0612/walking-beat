@@ -542,11 +542,23 @@ struct SetupWalkProgressView: View {
         .navigationTitle("Setup walk")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            if service.mode != .calibrating && resultMessage == nil {
+            if resultMessage == nil && service.mode == .idle {
                 service.settings = model.settings
-                Task { // defer so we never trigger sensors/state changes during view update
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            // Explicit start: a tap is a deterministic, observable event (auto-start on
+            // appear proved fragile on device — see diagnostics history).
+            if service.mode != .calibrating && resultMessage == nil {
+                Button {
                     service.startSetupWalk()
+                } label: {
+                    Text("Start the 2-minute walk").font(.title3.bold())
+                        .frame(maxWidth: .infinity, minHeight: 60)
                 }
+                .buttonStyle(.borderedProminent)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 8)
             }
         }
         .onChange(of: service.calibrationProgress) { progress in

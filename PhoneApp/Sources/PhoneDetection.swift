@@ -98,7 +98,9 @@ final class PhoneDetectionService: ObservableObject {
             return
         }
         let detector = try? profiles.makeDetector(profile: settings.sensitivity, overrides: settings.personalConfig)
-        startPipeline(detector: detector)
+        Task { @MainActor [weak self] in
+            self?.startPipeline(detector: detector)
+        }
         mode = .walkMode(active: detector != nil)
     }
 
@@ -118,12 +120,22 @@ final class PhoneDetectionService: ObservableObject {
         calibrationProgress = 0
         mode = .calibrating
         if CMPedometer.isCadenceAvailable() {
+            // First call surfaces the system Motion permission prompt; harmless if already granted.
             pedometer.startUpdates(from: Date()) { [weak self] data, _ in
                 guard let c = data?.currentCadence?.doubleValue, c > 0 else { return }
                 Task { @MainActor [weak self] in self?.cadenceSamples.append(c * 60) }
             }
         }
-        startPipeline(detector: nil) // features only, exactly like the watch's setup walk
+        // Motion permission also needs a moment of approval on first use; start sampling after
+        // the run loop settles so we never mutate published state inside a view update.
+        Task { @MainActor [weak self] in
+            self?.startPipeline(detector: nil) // features only, exactly like the watch's setup walk
+            self?.startProgressTimer()
+        }
+    }
+
+    private func startProgressTimer() {
+        calibrationProgressTimer?.invalidate()
         calibrationProgressTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, let start = self.calibrationStart else { return }

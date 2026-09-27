@@ -83,7 +83,16 @@ struct OnboardingView: View {
                 case 1: limits
                 case 2: rolePick
                 case 3: watchCheck
-                case 4: SetupWalkPage()
+                case 4:// SetupWalkPage kept for future watch-first flow; phone uses interactive progress
+                    NavigationLink { SetupWalkProgressView() } label: {
+                        VStack(spacing: 10) {
+                            Image(systemName: "figure.walk.circle.fill").font(.system(size: 56)).foregroundStyle(.tint)
+                            Text("Start the setup walk").font(.title3.bold())
+                            Text("2 minutes, this phone, no watch needed").font(.callout).foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 120)
+                    }
+                    .buttonStyle(.bordered)
                 case 5: tempoPage
                 default: done
                 }
@@ -142,11 +151,11 @@ struct OnboardingView: View {
     }
 
     private var watchCheck: some View {
-        page(icon: "applewatch", title: model.watchReachable ? "Watch connected" : "Pair the watch",
+        page(icon: "applewatch", title: model.watchReachable ? "Watch connected" : "This phone can run the beat",
              text: model.watchReachable
-                ? "Good. On the phone's Watch app, make sure \"Walking Beat\" is installed on the watch, then continue below."
-                : "Open the Watch app on this phone and install \"Walking Beat\" on the watch, or keep going and finish this later — the setup walk happens on the watch.") {
-            Text("This phone stores the walking journal and settings. The watch does the walking work.")
+                ? "Good. The watch will detect freezes and tap the beat automatically during walks."
+                : "No watch needed. This phone can run the beat, detect freezing in walk mode (keep it in a pocket), and do the setup walk. If a watch is paired later, everything moves to the wrist automatically.") {
+            Text("Either device keeps the same journal on this phone.")
                 .font(.callout).foregroundStyle(.secondary)
         }
     }
@@ -178,7 +187,7 @@ struct OnboardingView: View {
                         Button("Back") { withAnimation { step = max(step - 1, 0) } }
                             .frame(minHeight: 56)
                     }
-                    Button(step == 1 ? "Continue" : step == 3 ? "Start setup walk" : step == 5 ? "Set my beat" : "Next") {
+                    Button(step == 1 ? "Continue" : step == 4 ? "Walk start" : step == 5 ? "Set my beat" : "Next") {
                         withAnimation { step = min(step + 1, 6) }
                     }
                     .disabled(step == 1 && !agreedLimits)
@@ -490,7 +499,9 @@ struct SetupWalkProgressView: View {
         .onAppear {
             if service.mode != .calibrating && resultMessage == nil {
                 service.settings = model.settings
-                service.startSetupWalk()
+                Task { // defer so we never trigger sensors/state changes during view update
+                    service.startSetupWalk()
+                }
             }
         }
         .onChange(of: service.calibrationProgress) { progress in

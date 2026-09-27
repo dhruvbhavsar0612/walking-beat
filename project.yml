@@ -30,12 +30,13 @@ targets:
       path: PhoneApp/Info.plist
       properties:
         CFBundleDisplayName: Walking Beat
-        CFBundleShortVersionString: "1.4"
-        CFBundleVersion: "5"
+        CFBundleShortVersionString: "1.5"
+        CFBundleVersion: "6"
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
+        NSMotionUsageDescription: Walking Beat measures your motion during walk mode and the setup walk to detect freezing and set your beat tempo.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.fogcue

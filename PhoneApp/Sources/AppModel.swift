@@ -11,6 +11,29 @@ enum AppRole: String {
     case caregiver
 }
 
+/// How long the freeze signature must persist before the cue fires. Instant exists for
+/// demos/self-testing; Standard/Careful trade speed for fewer false alarms (the persistence
+/// gate is the main false-alarm defense — see docs/PRODUCT_PLAN.md section 4).
+enum CueDelay: String, CaseIterable, Identifiable {
+    case instant, standard, careful
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .instant: "Instant (~0.5 s)"
+        case .standard: "Standard (profile default)"
+        case .careful: "Careful (4 s)"
+        }
+    }
+    /// Override applied on top of the active profile's confirmSec; nil keeps profile default.
+    var confirmOverride: Double? {
+        switch self {
+        case .instant: 0.5
+        case .standard: nil
+        case .careful: 4.0
+        }
+    }
+}
+
 extension Notification.Name {
     /// Phone app's own beat (no watch needed): "start the rhythm right now".
     static let startPhoneBeat = Notification.Name("fogcue.startPhoneBeat")
@@ -46,11 +69,13 @@ final class PhoneBeatHost: ObservableObject {
     func attach(_ model: AppModel) {
         self.model = model
         service.settings = model.settings
+        service.confirmOverride = model.confirmOverride
     }
 
     private func handle(_ event: PhoneDetectionService.Event) {
         guard let model else { return }
         service.settings = model.settings // keep tempo/sensitivity in sync each event
+        service.confirmOverride = model.confirmOverride
         switch event {
         case .manualBeatStarted(let id):
             manualEvent = (id, Date())
@@ -105,6 +130,12 @@ final class AppModel: NSObject, ObservableObject {
     @Published var role: AppRole {
         didSet { UserDefaults.standard.set(role.rawValue, forKey: "fogcue.role") }
     }
+    /// Cue delay preference — kept OUT of CueSettings so it can't break Codable decoding of
+    /// existing stored settings when we add fields (learned that lesson with CFBundleVersion).
+    @Published var cueDelay: CueDelay {
+        didSet { UserDefaults.standard.set(cueDelay.rawValue, forKey: "fogcue.cueDelay") }
+    }
+    var confirmOverride: Double? { cueDelay.confirmOverride }
 
     private let eventsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("events.json")
@@ -121,6 +152,7 @@ final class AppModel: NSObject, ObservableObject {
         }
         onboarded = UserDefaults.standard.bool(forKey: "fogcue.onboarded")
         role = AppRole(rawValue: UserDefaults.standard.string(forKey: "fogcue.role") ?? "") ?? .caregiver
+        cueDelay = CueDelay(rawValue: UserDefaults.standard.string(forKey: "fogcue.cueDelay") ?? "") ?? .standard
         super.init()
         loadEvents()
         refreshStudyFiles()

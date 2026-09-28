@@ -456,7 +456,7 @@ struct PhoneWalkModeView: View {
                                 .foregroundStyle(service.lastProb >= (service.activeConfig?.probThreshold ?? 0.9) ? Color.red : Color.green)
                             ProgressView(value: min(service.lastProb, 1.0))
                                 .tint(service.lastProb >= (service.activeConfig?.probThreshold ?? 0.9) ? .red : .green)
-                            Text("profile: \(service.activeProfileName) · confirm \(Int(service.activeConfig?.confirmSec ?? 0)) s · walking-gate \(service.activeConfig?.requirePriorWalking == true ? "on" : "off")")
+                            Text("profile: \(service.activeProfileName) · fires ≥ \(String(format: "%.2f", service.activeConfig?.probThreshold ?? 0.9)) · confirm \(String(format: "%.1f", service.activeConfig?.confirmSec ?? 0)) s · walking-gate \(service.activeConfig?.requirePriorWalking == true ? "on" : "off")")
                                 .font(.caption2).foregroundStyle(.secondary)
                             Text("windows \(service.windowsEmitted) · freq \(String(format: "%.1f", service.lastDominantFreq)) Hz · FI \(String(format: "%.1f", service.lastFreezeIndex))")
                                 .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
@@ -778,8 +778,11 @@ struct SettingsView: View {
                         ForEach(SensitivityProfile.allCases) { Text($0.title).tag($0) }
                     }
                     .onChange(of: model.settings.sensitivity) { model.settings.personalConfig = nil }
+                    Picker("Cue delay after threshold", selection: $model.cueDelay) {
+                        ForEach(CueDelay.allCases) { Text($0.title).tag($0) }
+                    }
                 } header: { Text("Detection") } footer: {
-                    Text("\"Fewest false alarms\" is recommended to start. The Help button on the watch always works, even with detection off. Changing sensitivity clears the personal setup; repeat the setup walk afterwards.")
+                    Text("Sensitivity changes take effect the next time walk mode starts, and clear the personal setup (redo the setup walk). \"Instant\" fires almost immediately when the freeze score crosses the line — best for demos and self-testing; Standard/Careful wait for the signature to persist, which reduces false alarms. The Help button on the watch always works, even with detection off.")
                 }
                 Section("Setup walk") {
                     NavigationLink("Redo setup walk on this phone") { SetupWalkProgressView() }

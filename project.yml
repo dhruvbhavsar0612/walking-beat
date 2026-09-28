@@ -19,7 +19,7 @@ targets:
   FoGCue:
     type: application
     platform: iOS
-    sources: [PhoneApp/Sources, {path: PhoneApp/Resources, buildPhase: resources}]
+    sources: [PhoneApp/Sources, {path: PhoneApp/Resources, buildPhase: resources}, {path: PhoneApp/Assets.xcassets}]
     dependencies:
       - package: FoGCore
         product: FoGCore
@@ -30,8 +30,8 @@ targets:
       path: PhoneApp/Info.plist
       properties:
         CFBundleDisplayName: Walking Beat
-        CFBundleShortVersionString: "2.5"
-        CFBundleVersion: "16"
+        CFBundleShortVersionString: "2.6"
+        CFBundleVersion: "17"
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIFileSharingEnabled: true
@@ -41,6 +41,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.fogcue
         TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
   FoGML:
     type: application
     platform: iOS
@@ -48,6 +49,7 @@ targets:
       - path: MLApp/Sources
       - path: MLApp/Resources
         buildPhase: sources # .mlmodel must be compiled by coremlc to generate the class
+      - path: MLApp/Assets.xcassets
     info:
       path: MLApp/Info.plist
       properties:
@@ -61,10 +63,11 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.fogcue.ml
         TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
   FoGCueWatch:
     type: application
     platform: watchOS
-    sources: [WatchApp/Sources]
+    sources: [WatchApp/Sources, {path: WatchApp/Assets.xcassets}]
     dependencies:
       - package: FoGCore
         product: FoGCore
@@ -89,4 +92,5 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.fogcue.watchkitapp
         TARGETED_DEVICE_FAMILY: "4"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SKIP_INSTALL: YES

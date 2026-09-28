@@ -86,6 +86,8 @@ final class PhoneDetectionService: ObservableObject {
 
     var onEvent: ((Event) -> Void)?
     var settings = CueSettings()
+    /// User cue-delay preference applied on top of the profile's confirmSec (nil = default).
+    var confirmOverride: Double? = nil
 
     var isAvailable: Bool { motion.isAccelerometerAvailable }
 
@@ -139,7 +141,13 @@ final class PhoneDetectionService: ObservableObject {
             onEvent?(.unavailable("Detector model missing"))
             return
         }
-        let detector = try? profiles.makeDetector(profile: settings.sensitivity, overrides: settings.personalConfig)
+        var overrides = settings.personalConfig
+        if let o = confirmOverride {
+            var cfg = overrides ?? profiles.config(for: settings.sensitivity)
+            cfg.confirmSec = o
+            overrides = cfg
+        }
+        let detector = try? profiles.makeDetector(profile: settings.sensitivity, overrides: overrides)
         activeConfig = detector?.cfg
         activeProfileName = settings.personalConfig != nil ? "personalised" : settings.sensitivity.rawValue
         Task { @MainActor [weak self] in

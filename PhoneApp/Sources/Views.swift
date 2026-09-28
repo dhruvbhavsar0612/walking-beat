@@ -451,11 +451,13 @@ struct PhoneWalkModeView: View {
                         // Live meter: shows exactly how freeze-like the current motion is, so a
                         // self-tester can see distance-to-trigger in real time.
                         VStack(spacing: 4) {
-                            Text(String(format: "freeze likelihood %.2f (fires ≥ %.2f)", service.lastProb, 0.9))
+                            Text(String(format: "freeze likelihood %.2f (fires ≥ %.2f)", service.lastProb, service.activeConfig?.probThreshold ?? 0.9))
                                 .font(.callout.monospacedDigit().bold())
-                                .foregroundStyle(service.lastProb >= 0.9 ? Color.red : Color.green)
+                                .foregroundStyle(service.lastProb >= (service.activeConfig?.probThreshold ?? 0.9) ? Color.red : Color.green)
                             ProgressView(value: min(service.lastProb, 1.0))
-                                .tint(service.lastProb >= 0.9 ? .red : .green)
+                                .tint(service.lastProb >= (service.activeConfig?.probThreshold ?? 0.9) ? .red : .green)
+                            Text("profile: \(service.activeProfileName) · confirm \(Int(service.activeConfig?.confirmSec ?? 0)) s · walking-gate \(service.activeConfig?.requirePriorWalking == true ? "on" : "off")")
+                                .font(.caption2).foregroundStyle(.secondary)
                             Text("windows \(service.windowsEmitted) · freq \(String(format: "%.1f", service.lastDominantFreq)) Hz · FI \(String(format: "%.1f", service.lastFreezeIndex))")
                                 .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
                         }

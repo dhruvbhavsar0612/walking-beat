@@ -79,6 +79,10 @@ final class PhoneDetectionService: ObservableObject {
     @Published private(set) var lastProb: Double = 0
     /// Last failure that aborted a start attempt — surfaced in the UI, never silent.
     @Published private(set) var lastError: String?
+    /// The detector configuration actually in use (profile + personal overrides) — shown in
+    /// the walk-mode meter so sensitivity changes are verifiable, not invisible.
+    @Published private(set) var activeConfig: DetectorConfig?
+    @Published private(set) var activeProfileName: String = ""
 
     var onEvent: ((Event) -> Void)?
     var settings = CueSettings()
@@ -136,6 +140,8 @@ final class PhoneDetectionService: ObservableObject {
             return
         }
         let detector = try? profiles.makeDetector(profile: settings.sensitivity, overrides: settings.personalConfig)
+        activeConfig = detector?.cfg
+        activeProfileName = settings.personalConfig != nil ? "personalised" : settings.sensitivity.rawValue
         Task { @MainActor [weak self] in
             self?.startPipeline(detector: detector)
         }
@@ -149,6 +155,8 @@ final class PhoneDetectionService: ObservableObject {
         endAutomaticCue(reason: .manual)
         stopPipeline()
         UIApplication.shared.isIdleTimerDisabled = false
+        activeConfig = nil
+        activeProfileName = ""
         if case .walkMode = mode { mode = .idle }
     }
 
@@ -467,7 +475,7 @@ final class PhoneDetectionService: ObservableObject {
     /// Audio click via AVAudioPlayer, haptic via UIImpactFeedbackGenerator (works while the
     /// app is active; iOS pauses timers when suspended — a documented limitation).
     private func playBeatLoop() {
-        audio.prepare()
+        audio.prepare(style: settings.audioStyle, volume: Float(settings.volume))
         haptic.prepare()
         beatTimer?.invalidate()
         beatTimer = Timer.scheduledTimer(withTimeInterval: 60.0 / Double(max(settings.bpm, 1)), repeats: true) { [weak self] _ in
@@ -498,28 +506,69 @@ final class PhoneDetectionService: ObservableObject {
     }()
 }
 
-/// Metronome audio for cueing from the phone speaker; click synthesis shared with the
-/// caregiver preview so no audio assets ship.
+/// Metronome audio for cueing from the phone speaker. Honors the caregiver's sound style
+/// (metronome click / soft drum / spoken count) and volume — previously the phone always
+/// played the same click regardless of settings (a real gap vs the watch's CueEngine).
 final class PhoneCueAudio {
     private var player: AVAudioPlayer?
+    private var synthesizer = AVSpeechSynthesizer()
+    private var style: AudioStyle = .metronome
+    private var volume: Float = 0.8
+    private var beatNumber = 0
+    private let numberWords = ["one", "two", "three", "four"]
 
-    func prepare() {
+    func prepare(style: AudioStyle, volume: Float) {
+        self.style = style
+        self.volume = volume
         try? AVAudioSession.sharedInstance().setCategory(.playback, options: [.duckOthers])
         try? AVAudioSession.sharedInstance().setActive(true)
-        if player == nil {
-            player = try? AVAudioPlayer(data: MetronomePreview.clickWAV())
+        switch style {
+        case .voiceCount: break // speech, no WAV player
+        default:
+            let wav: Data = style == .drum ? Self.drumWAV() : MetronomePreview.clickWAV()
+            player = try? AVAudioPlayer(data: wav)
+            player?.volume = volume
             player?.prepareToPlay()
         }
     }
 
-    /// One click per call; the beat timer drives tempo.
+    /// One beat per call; the beat timer drives tempo.
     func tick() {
-        player?.currentTime = 0
-        player?.play()
+        switch style {
+        case .voiceCount:
+            let word = numberWords[beatNumber % numberWords.count]
+            let u = AVSpeechUtterance(string: word)
+            u.volume = volume
+            u.rate = 0.5
+            synthesizer.speak(u)
+        default:
+            player?.currentTime = 0
+            player?.play()
+        }
+        beatNumber += 1
     }
 
     func stop() {
         player?.stop()
+        synthesizer.stopSpeaking(at: .immediate)
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
+    /// 120 Hz decaying thump — a "soft drum" beat, distinct from the 1 kHz click.
+    static func drumWAV(sampleRate: Int = 44_100) -> Data {
+        let n = sampleRate / 8 // 125 ms
+        var pcm = Data(capacity: n * 2)
+        for i in 0..<n {
+            let t = Double(i) / Double(sampleRate)
+            let v = Int16(sin(2 * .pi * 120 * t) * exp(-t / 0.04) * 0.9 * Double(Int16.max))
+            withUnsafeBytes(of: v.littleEndian) { pcm.append(contentsOf: $0) }
+        }
+        var d = Data()
+        func u32(_ v: UInt32) { withUnsafeBytes(of: v.littleEndian) { d.append(contentsOf: $0) } }
+        func u16(_ v: UInt16) { withUnsafeBytes(of: v.littleEndian) { d.append(contentsOf: $0) } }
+        d.append(contentsOf: Array("RIFF".utf8)); u32(UInt32(36 + pcm.count)); d.append(contentsOf: Array("WAVE".utf8))
+        d.append(contentsOf: Array("fmt ".utf8)); u32(16); u16(1); u16(1); u32(UInt32(sampleRate)); u32(UInt32(sampleRate * 2)); u16(2); u16(16)
+        d.append(contentsOf: Array("data".utf8)); u32(UInt32(pcm.count)); d.append(pcm)
+        return d
     }
 }

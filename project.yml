@@ -41,6 +41,26 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.fogcue
         TARGETED_DEVICE_FAMILY: "1"
+  FoGML:
+    type: application
+    platform: iOS
+    sources:
+      - path: MLApp/Sources
+      - path: MLApp/Resources
+        buildPhase: sources # .mlmodel must be compiled by coremlc to generate the class
+    info:
+      path: MLApp/Info.plist
+      properties:
+        CFBundleDisplayName: Walking Beat ML
+        CFBundleShortVersionString: "0.1"
+        CFBundleVersion: "1"
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSMotionUsageDescription: The ML comparison app measures motion to evaluate a random-forest freezing detector.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.fogcue.ml
+        TARGETED_DEVICE_FAMILY: "1"
   FoGCueWatch:
     type: application
     platform: watchOS

@@ -415,9 +415,26 @@ struct PhoneWalkModeView: View {
                         Text("Start walk mode").font(.title2.bold()).frame(maxWidth: .infinity, minHeight: 64)
                     }
                     .buttonStyle(.borderedProminent)
+                    Divider().padding(.vertical, 4)
+                    // Deterministic demo for presentations: a real Parkinson's patient recording
+                    // (Daphnet dataset, thigh sensor) replayed through the same live detector.
+                    Text("Demo for presentations").font(.headline)
+                    Text("Replays a real patient recording (S02R02, Daphnet dataset, thigh sensor) through the same detector. At ~23 s a recorded freeze appears and the beat fires — no walking needed.")
+                        .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    Button {
+                        service.startDemoReplay()
+                    } label: {
+                        Label("Run patient-data demo", systemImage: "play.circle.fill")
+                            .font(.title3.bold()).frame(maxWidth: .infinity, minHeight: 56)
+                    }
+                    .buttonStyle(.bordered)
                 }
             case .walkMode(let active):
                 VStack(spacing: 20) {
+                    if service.demoActive {
+                        Text("DEMO — replaying patient S02R02").font(.caption.bold()).foregroundStyle(.orange)
+                        Text(String(format: "replay %.0f s / 40 s", service.demoElapsed)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    }
                     Image(systemName: active ? "waveform.path.ecg" : "waveform.slash").font(.system(size: 56)).foregroundStyle(active ? .green : .secondary)
                     Text(active ? "Listening while you walk" : "Detection unavailable").font(.title2.bold())
                     if service.beatActive {
@@ -435,7 +452,7 @@ struct PhoneWalkModeView: View {
                     Button(role: .destructive) {
                         showStopConfirm = true
                     } label: {
-                        Text("End walk mode").frame(maxWidth: .infinity, minHeight: 56)
+                        Text(service.demoActive ? "End demo" : "End walk mode").frame(maxWidth: .infinity, minHeight: 56)
                     }
                     .buttonStyle(.bordered)
                 }
@@ -447,13 +464,17 @@ struct PhoneWalkModeView: View {
         .navigationTitle("Walk mode")
         .navigationBarTitleDisplayMode(.inline)
         .alert("End walk mode?", isPresented: $showStopConfirm) {
-            Button("End", role: .destructive) { service.stopWalkMode(); dismiss() }
+            Button("End", role: .destructive) {
+                if service.demoActive { service.stopDemoReplay() } else { service.stopWalkMode() }
+                dismiss()
+            }
             Button("Keep going", role: .cancel) {}
         } message: {
             Text("Automatic detection and its beat stop now; the Help button always stays available.")
         }
         .onDisappear {
-            if case .walkMode = service.mode { service.stopWalkMode() }
+            if service.demoActive { service.stopDemoReplay() }
+            else if case .walkMode = service.mode { service.stopWalkMode() }
         }
     }
 }

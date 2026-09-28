@@ -9,6 +9,22 @@ import UIKit
 
 private let diagLog = os.Logger(subsystem: "com.example.fogcue", category: "PhoneDetection")
 
+/// Codable mirror of the demo_meta.json bundled with the app (snake_case JSON, decoded the
+/// same way the parity fixtures are: convertFromSnakeCase).
+private struct DemoMeta: Decodable {
+    let recording: String
+    let dataset: String?
+    let segmentStartS: Double
+    let sampleRate: Double
+    let events: [DemoEvent]
+    let detectorConfig: DetectorConfig?
+    struct DemoEvent: Decodable {
+        let onsetT: Double
+        let confirmedT: Double
+        let endT: Double
+    }
+}
+
 /// Beat cueing on the phone itself, for when no watch is paired. Audio + haptics from the
 /// handheld device. One class serves three jobs so event journaling has a single path:
 /// - manual beat (always available)
@@ -235,6 +251,119 @@ final class PhoneDetectionService: ObservableObject {
     }
 
     private var windowsSnapshot: [WindowFeatures] { calibrationWindows }
+
+    /// True when the current walk is a demo replay of recorded patient data.
+    @Published private(set) var demoActive = false
+    /// Relative replay time in seconds (for the demo progress readout).
+    @Published private(set) var demoElapsed: Double = 0
+    private var demoSamples: [AccelSample]?
+    private var demoIndex = 0
+    private var demoTimer: Timer?
+    private var demoSegmentStart = 0.0
+
+    /// Replays a recorded patient freeze segment (Daphnet S02R02 thigh sensor) through the
+    /// IDENTICAL live pipeline — same windows, detector, gates, cue engine, journaling.
+    func startDemoReplay() {
+        guard !beatActive else { return }
+        guard let metaURL = Bundle.main.url(forResource: "demo_meta", withExtension: "json"),
+              let csvURL = Bundle.main.url(forResource: "demo_segment", withExtension: "csv") else {
+            lastError = "Demo data missing from app bundle."
+            return
+        }
+        guard let profiles = try? DetectorProfiles.bundled() else {
+            lastError = "Detector model missing"
+            return
+        }
+        // The reference configuration from the research pipeline guarantees the same outcome
+        // the parity test verifies on this exact segment (personal overrides not applied so
+        // the demo always shows the published behavior).
+        var demoConfig = DetectorConfig()
+        var recording = "patient recording"
+        if let data = try? Data(contentsOf: metaURL),
+           let meta = try? DetectorProfiles.decoder().decode(DemoMeta.self, from: data) {
+            if let dc = meta.detectorConfig { demoConfig = dc }
+            recording = meta.recording
+            demoSegmentStart = meta.segmentStartS
+        }
+        guard let detector = try? FoGDetector(config: demoConfig, model: profiles.model) else {
+            lastError = "Could not build demo detector"
+            return
+        }
+        do {
+            let text = try String(contentsOf: csvURL, encoding: .utf8)
+            demoSamples = try text.split(separator: "\n").map { line in
+                let c = line.split(separator: ",").map { Double($0)! }
+                return AccelSample(x: c[0], y: c[1], z: c[2])
+            }
+        } catch {
+            lastError = "Demo data unreadable: \(error.localizedDescription)"
+            return
+        }
+        self.detector = detector
+        self.window = SlidingWindow(windowSec: demoConfig.windowSec, hopSec: demoConfig.hopSec, sampleRate: Self.sampleRate)
+        startedAt = Date()
+        lastT = 0
+        windowsEmitted = 0
+        gaitWindowCount = 0
+        demoIndex = 0
+        demoElapsed = 0
+        demoActive = true
+        lastError = nil
+        demoTimer?.invalidate()
+        // Real-time pacing: 16 samples every 250 ms = 64 Hz, exactly like walk mode.
+        demoTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.demoTick() }
+        }
+        if let t = demoTimer { RunLoop.main.add(t, forMode: .common) }
+        mode = .walkMode(active: true)
+        diagLog.info("demo replay started")
+    }
+
+    private func demoTick() {
+        guard let samples = demoSamples, demoIndex < samples.count else {
+            stopDemoReplay(endReason: .timeout)
+            return
+        }
+        let end = min(demoIndex + 4, samples.count) // 4 samples per 250 ms tick = 64 Hz
+        for i in demoIndex..<end { processRaw(samples[i]) }
+        demoIndex = end
+        demoElapsed = Double(demoIndex) / Self.sampleRate
+    }
+
+    func stopDemoReplay(endReason: CueEndReason = .manual) {
+        demoTimer?.invalidate()
+        demoTimer = nil
+        endAutomaticCue(reason: endReason)
+        stopPipeline()
+        demoSamples = nil
+        demoActive = false
+        demoElapsed = 0
+        if case .walkMode = mode { mode = .idle }
+        diagLog.info("demo replay stopped")
+    }
+
+    /// process() without the sensorSampleCount increment (demo samples are not phone samples).
+    private func processRaw(_ s: AccelSample) {
+        guard let f = window?.push(s) else { return }
+        windowsEmitted += 1
+        lastDominantFreq = f.dominantFreq
+        lastLocoPower = f.locoPower
+        lastFreezeIndex = f.freezeIndex
+        lastT = f.tEnd
+        guard var d = detector else { return }
+        let out = d.update(f)
+        detector = d
+        switch out {
+        case .cueStarted(let e):
+            beatActive = true
+            playBeatLoop()
+            onEvent?(.cueStarted(e))
+        case .cueEnded(let e):
+            stopBeatSounds()
+            onEvent?(.cueEnded(e, e.endReason ?? .timeout))
+        case .none: break
+        }
+    }
 
     // MARK: Pipeline
 

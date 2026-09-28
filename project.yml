@@ -19,7 +19,7 @@ targets:
   FoGCue:
     type: application
     platform: iOS
-    sources: [PhoneApp/Sources]
+    sources: [PhoneApp/Sources, {path: PhoneApp/Resources, buildPhase: resources}]
     dependencies:
       - package: FoGCore
         product: FoGCore
@@ -30,8 +30,8 @@ targets:
       path: PhoneApp/Info.plist
       properties:
         CFBundleDisplayName: Walking Beat
-        CFBundleShortVersionString: "2.2"
-        CFBundleVersion: "13"
+        CFBundleShortVersionString: "2.3"
+        CFBundleVersion: "14"
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIFileSharingEnabled: true

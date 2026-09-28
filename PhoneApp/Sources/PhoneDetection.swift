@@ -75,6 +75,8 @@ final class PhoneDetectionService: ObservableObject {
     @Published private(set) var lastDominantFreq: Double = 0
     @Published private(set) var lastLocoPower: Double = 0
     @Published private(set) var lastFreezeIndex: Double = 0
+    /// Last detector probability (0-1) — the live "how freeze-like does this look" number.
+    @Published private(set) var lastProb: Double = 0
     /// Last failure that aborted a start attempt — surfaced in the UI, never silent.
     @Published private(set) var lastError: String?
 
@@ -138,11 +140,15 @@ final class PhoneDetectionService: ObservableObject {
             self?.startPipeline(detector: detector)
         }
         mode = .walkMode(active: detector != nil)
+        // Self-testing in a pocket requires the screen to stay on: iOS suspends motion
+        // sampling when the app is locked. Reset on exit.
+        UIApplication.shared.isIdleTimerDisabled = true
     }
 
     func stopWalkMode() {
         endAutomaticCue(reason: .manual)
         stopPipeline()
+        UIApplication.shared.isIdleTimerDisabled = false
         if case .walkMode = mode { mode = .idle }
     }
 
@@ -430,6 +436,10 @@ final class PhoneDetectionService: ObservableObject {
         }
         let out = d.update(f)
         detector = d
+        lastProb = d.lastScore
+        if windowsEmitted % 4 == 0 {
+            diagLog.info("walk windows=\(self.windowsEmitted) freq=\(f.dominantFreq, format: .fixed(precision: 2)) loco=\(f.locoPower, format: .exponential(precision: 2)) fi=\(f.freezeIndex, format: .fixed(precision: 2)) prob=\(d.lastScore, format: .fixed(precision: 2)) gait=\(self.gaitWindowCount)")
+        }
         switch out {
         case .cueStarted(let e):
             beatActive = true

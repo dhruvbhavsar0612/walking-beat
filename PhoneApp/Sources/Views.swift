@@ -448,6 +448,18 @@ struct PhoneWalkModeView: View {
                     } else {
                         Text("Keep the phone in a pocket. Turn it off before sitting down — it only watches while walking.")
                             .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                        // Live meter: shows exactly how freeze-like the current motion is, so a
+                        // self-tester can see distance-to-trigger in real time.
+                        VStack(spacing: 4) {
+                            Text(String(format: "freeze likelihood %.2f (fires ≥ %.2f)", service.lastProb, 0.9))
+                                .font(.callout.monospacedDigit().bold())
+                                .foregroundStyle(service.lastProb >= 0.9 ? Color.red : Color.green)
+                            ProgressView(value: min(service.lastProb, 1.0))
+                                .tint(service.lastProb >= 0.9 ? .red : .green)
+                            Text("windows \(service.windowsEmitted) · freq \(String(format: "%.1f", service.lastDominantFreq)) Hz · FI \(String(format: "%.1f", service.lastFreezeIndex))")
+                                .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal)
                     }
                     Button(role: .destructive) {
                         showStopConfirm = true

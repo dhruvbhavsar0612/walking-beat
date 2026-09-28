@@ -104,6 +104,22 @@ adaptation + real wrist data is the main lever, not better generic ML.
 5. Patentability bar to check: is 1-3 combined "non-obvious"? Get a patentability opinion only
    if phase 2/3 data shows the moat is real. Trade-secret the calibration internals meanwhile.
 
+## v16 — settings verified + made functional (2026-09-27)
+
+- **Sensitivity profiles are functional but subtle** (bundled detector_profiles.json): all three
+  share prob_threshold 0.9; differences are confirm_sec (4/3/3 s) and the require_prior_walking
+  gate (on/on/**off** for responsive). Switching clears personalConfig (by design) and takes
+  effect at next walk-mode start.
+- **Sound options were static on the phone** (always the same click; volume/audioStyle ignored
+  — watch-only). Fixed: PhoneCueAudio now honors audioStyle (click / 120 Hz drum thump /
+  AVSpeechSynthesizer spoken count) and volume.
+- Walk-mode meter now shows the ACTIVE profile name, firing threshold, confirm seconds, and
+  walking-gate state — settings differences are visible instead of invisible.
+- ML teammate model: random forest via Core ML, installed as separate app "Walking Beat ML"
+  (com.example.fogcue.ml, v1) — kept installed but parked; pkl archived at
+  research/teammate_model/. Head-to-head LOSO eval pending (use fog_api_server.py + pkl or
+  wire .mlmodel into a Swift harness).
+
 ## v4 — phone detection parity (2026-09-27, branch `v4-phone-detection`)
 
 Phone now mirrors the watch's core abilities without any watch:

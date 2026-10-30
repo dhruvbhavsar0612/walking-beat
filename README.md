@@ -1,5 +1,7 @@
 # Walking Beat: freezing-of-gait cueing for Apple Watch + iPhone
 
+Team members : [Priyanshi ranawat](https://github.com/priyanshiranawat15) and team 
+
 When someone with Parkinson's disease freezes mid-walk, the watch taps a steady beat on the wrist
 and, if needed, plays a sound. Stepping in time with a rhythm helps many people start walking
 again (the RESCUE trial and the meta-analyses listed in [docs/REFERENCES.md](docs/REFERENCES.md)).
